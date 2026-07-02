@@ -94,7 +94,7 @@ fi
 # ------------------------------------------------------------
 if ! sudo -u hermes bash -c 'command -v hermes >/dev/null 2>&1'; then
   log "Installing Hermes..."
-  sudo -u hermes bash -c 'curl -sSL https://install.hermes.nous.ai | bash' \
+  sudo -u hermes bash -c 'curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash' \
     || warn "Hermes installer not reachable yet — install manually and re-run."
 fi
 
@@ -124,8 +124,10 @@ if [ ! -f /home/hermes/.hermes/.env ]; then
 # Fill these in — Hermes won't start without at least ANTHROPIC_API_KEY or GOOGLE_API_KEY.
 ANTHROPIC_API_KEY=
 GOOGLE_API_KEY=
-TELEGRAM_ADMIN_BOT_TOKEN=
-TELEGRAM_OWNER_ID=
+# config.yaml's platforms.telegram does NOT expand ${VAR} templates — the
+# gateway only reads these flat env vars directly.
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_ALLOWED_USERS=
 EOF
   chmod 600 /home/hermes/.hermes/.env
   chown hermes:hermes /home/hermes/.hermes/.env

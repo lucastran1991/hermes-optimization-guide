@@ -69,7 +69,7 @@ Then:
 ```bash
 # For each dev or client:
 adduser --disabled-password --gecos "" alice
-sudo -u alice curl -sSL https://install.hermes.nous.ai | bash
+sudo -u alice curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
 cp templates/config/production.yaml /home/alice/.hermes/config.yaml
 chown alice:alice /home/alice/.hermes/config.yaml
 systemctl enable --now hermes@alice.service

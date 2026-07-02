@@ -61,15 +61,12 @@ models:
     anthropic:
       api_key: "${ANTHROPIC_API_KEY}"       # Used by sandboxed Claude Code
 
-gateways:
-  cli: { enabled: true }
+platforms:
   telegram:
     enabled: true
-    bots:
-      admin:
-        token: "${TELEGRAM_ADMIN_BOT_TOKEN}"
-        allowed_user_ids:
-          - ${TELEGRAM_OWNER_ID}
+    # `${VAR}` templating is NOT expanded on this config path — set the
+    # real values via env instead: TELEGRAM_BOT_TOKEN, TELEGRAM_ALLOWED_USERS
+    # (comma-separated numeric IDs) in ~/.hermes/.env.
 
 # The money section
 remote_sandbox:

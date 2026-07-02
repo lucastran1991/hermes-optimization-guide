@@ -13,7 +13,7 @@ From zero to working Telegram bot.
 ## Step 1 — Install Hermes
 
 ```bash
-curl -sSL https://install.hermes.nous.ai | bash
+curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
 hermes --version          # sanity check
 ```
 
@@ -44,8 +44,8 @@ cat > ~/.hermes/.env <<'EOF'
 ANTHROPIC_API_KEY=sk-ant-...
 OPENAI_API_KEY=sk-...                 # required by telegram-bot.yaml for LightRAG embeddings
 GOOGLE_API_KEY=AIza...                # required by telegram-bot.yaml for Gemini Flash classification + LightRAG LLM
-TELEGRAM_ADMIN_BOT_TOKEN=1234567890:ABC...
-TELEGRAM_OWNER_ID=1234567            # your numeric ID from @userinfobot
+TELEGRAM_BOT_TOKEN=1234567890:ABC...
+TELEGRAM_ALLOWED_USERS=1234567       # your numeric ID from @userinfobot, comma-separated for multiple
 EOF
 
 chmod 600 ~/.hermes/.env

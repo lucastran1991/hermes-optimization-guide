@@ -87,16 +87,12 @@ models:
     - when: task == "coding" && complexity == "high"
       use: anthropic/claude-sonnet-5
 
-gateways:
-  cli:
-    enabled: true
+platforms:
   telegram:
     enabled: true
-    bots:
-      admin:
-        token: "${TELEGRAM_ADMIN_BOT_TOKEN}"
-        allowed_user_ids:
-          - ${TELEGRAM_OWNER_ID}
+    # `${VAR}` templating is NOT expanded on this config path — set the
+    # real values via env instead: TELEGRAM_BOT_TOKEN, TELEGRAM_ALLOWED_USERS
+    # (comma-separated numeric IDs) in ~/.hermes/.env.
 
 memory:
   backend: lightrag
