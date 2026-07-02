@@ -15,7 +15,7 @@
 
 > **Current through Hermes Agent v0.18.0 (v2026.7.1) — "The Judgment Release"** · **27 parts, 13 installable guide skills, 5 opinionated configs, 4 reference architectures, one-command VPS bootstrap** · Now covering **Mixture-of-Agents as a first-class model**, evidence-based **verification** + `/goal` completion contracts, **`/learn` + `/journey`** self-improvement, **background subagent fan-out**, the maturing **Desktop app** (Projects, memory graph, multi-terminal), **iMessage via Photon** (no Mac needed), the NVIDIA RTX / DGX Spark local-hardware story, and gateway **scale-to-zero** for teams. **Bring any model** — this guide is about the *harness*, not the weights.
 >
-> Other languages: [中文](./README-zh.md) · [日本語](./README-ja.md)
+> Other languages: [中文](./README-zh.md) · [日本語](./README-ja.md) · [Tiếng Việt](./README-vi.md)
 
 ### The End-to-End Hermes Guide — docs + runnable artifacts
 Every part you need to go from fresh install to a production Hermes deployment — driven from the **native desktop app**, the CLI/TUI, a browser admin panel, or 25+ chat platforms (now including iMessage with no Mac required, via Photon). Orchestrate Claude Code / Codex / Gemini CLI through durable Kanban lanes and **multi-agent swarms**, plug into any MCP server, trace every call in Langfuse, let it curate its own skills, push heavy work onto disposable Modal/Daytona/Vercel sandboxes — or run the whole thing **locally on your own GPU / NVIDIA DGX Spark**. It's all **model-agnostic**: bring whatever weights you want, the guide is about the *harness*.
