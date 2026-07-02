@@ -332,17 +332,14 @@ function generate() {
   lines.push(``);
 
   // Gateways
-  lines.push(`gateways:`);
-  if (gateways.cli) lines.push(`  cli:\n    enabled: true`);
+  lines.push(`platforms:`);
   if (gateways.telegram) {
     lines.push(`  telegram:`);
     lines.push(`    enabled: true`);
-    lines.push(`    bots:`);
-    lines.push(`      admin:`);
-    lines.push(`        token: "$\{TELEGRAM_ADMIN_BOT_TOKEN\}"`);
-    lines.push(`        allowed_user_ids:`);
-    lines.push(`          - $\{TELEGRAM_OWNER_ID\}`);
-    lines.push(`        trust_label: high`);
+    lines.push(`    # `+'`'+`\${VAR}`+'`'+` templating is NOT expanded on this config path — set the`);
+    lines.push(`    # real values via env instead: TELEGRAM_BOT_TOKEN, TELEGRAM_ALLOWED_USERS`);
+    lines.push(`    # (comma-separated numeric IDs) in ~/.hermes/.env.`);
+    lines.push(`    trust_label: high`);
   }
   if (gateways.discord) {
     lines.push(`  discord:`);

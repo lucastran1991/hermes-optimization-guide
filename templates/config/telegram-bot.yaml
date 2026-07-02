@@ -24,24 +24,16 @@ models:
     openai:
       api_key: ${OPENAI_API_KEY}
 
-gateways:
-  cli:
-    enabled: true
+platforms:
   telegram:
     enabled: true
-    bots:
-      # Primary / admin bot — this is YOU
-      admin:
-        token: ${TELEGRAM_ADMIN_BOT_TOKEN}
-        allowed_user_ids:
-          - ${TELEGRAM_OWNER_ID}
-        trust_label: high
-        default_skill: default
-      # Public bot — strangers talk to this one (optional, comment out to skip)
-      # public:
-      #   token: ${TELEGRAM_PUBLIC_BOT_TOKEN}
-      #   trust_label: untrusted
-      #   default_skill: telegram-triage
+    # `${VAR}` templating is NOT expanded on this config path — set the
+    # real values via env instead: TELEGRAM_BOT_TOKEN, TELEGRAM_ALLOWED_USERS
+    # (comma-separated numeric IDs) in ~/.hermes/.env.
+    trust_label: high
+    default_skill: default
+    # Hermes has no multi-bot support (single token/allow_from per
+    # platform) — a separate public/quarantined bot isn't currently possible.
 
 memory:
   backend: lightrag

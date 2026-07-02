@@ -17,10 +17,6 @@ models:
     anthropic:
       api_key: ${ANTHROPIC_API_KEY}
 
-gateways:
-  cli:
-    enabled: true
-
 memory:
   backend: vector
   vector:

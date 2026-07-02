@@ -58,19 +58,14 @@ routing:
     - intent: live_search
       model: xai/grok-4.3
 
-gateways:
-  cli: { enabled: true }
-  dashboard:
-    enabled: true
-    listen: 127.0.0.1:8765          # Bind loopback only; expose via Caddy
+platforms:
   telegram:
     enabled: true
-    bots:
-      admin:
-        token: ${TELEGRAM_ADMIN_BOT_TOKEN}
-        allowed_user_ids:
-          - ${TELEGRAM_OWNER_ID}
-        trust_label: high
+    # `${VAR}` templating is NOT expanded on this config path — the gateway
+    # loader reads token/allow_from straight from raw YAML. Set the real
+    # values via env instead: TELEGRAM_BOT_TOKEN, TELEGRAM_ALLOWED_USERS
+    # (comma-separated numeric IDs) in ~/.hermes/.env.
+    trust_label: high
   discord:
     enabled: true
     bot_token: ${DISCORD_BOT_TOKEN}

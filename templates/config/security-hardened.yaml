@@ -39,20 +39,19 @@ models:
     google:
       api_key: "${GOOGLE_API_KEY}"
 
-gateways:
-  cli: { enabled: true, profile: trusted }        # Local CLI = admin
+platforms:
   telegram:
     enabled: true
-    bots:
-      admin:
-        token: ${TELEGRAM_ADMIN_BOT_TOKEN}
-        allowed_user_ids:
-          - ${TELEGRAM_OWNER_ID}
-        profile: trusted
-      public:
-        token: ${TELEGRAM_PUBLIC_BOT_TOKEN}
-        profile: quarantine                       # Public bot locked down
-        default_skill: telegram-triage
+    # `${VAR}` templating is NOT expanded on this config path — set the
+    # real values via env instead: TELEGRAM_BOT_TOKEN, TELEGRAM_ALLOWED_USERS
+    # (comma-separated numeric IDs) in ~/.hermes/.env.
+    profile: trusted
+    # hermes-agent has no multi-bot support (one token/allow_from per
+    # platform) — the previous admin+quarantined-public two-bot split
+    # isn't representable today. TELEGRAM_PUBLIC_BOT_TOKEN is unused;
+    # everyone who talks to this bot gets the `trusted` profile above.
+    # Run a second gateway process on a separate profile if you need
+    # the public/quarantine split back.
   discord:
     enabled: true
     bot_token: ${DISCORD_BOT_TOKEN}
