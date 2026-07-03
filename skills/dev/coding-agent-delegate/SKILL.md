@@ -29,6 +29,15 @@ parameters:
 
 > **Security note:** Delegated sub-sessions may get write/exec tools (`Edit`, `Bash`, `Write`). Scope the tool allowlist to the minimum required per tier. Isolate each delegation on its own branch/worktree. Never pass writable production credentials into a sub-session.
 
+## Prerequisites
+
+The routing table below shells out to external CLIs: `claude` (claude-code), `codex`, `gemini` (gemini-cli), `opencode`. Each one must be installed **for the user that runs the Hermes gateway** and resolvable from the **service PATH** — not just from an interactive shell:
+
+- systemd does not read shell profiles. A CLI installed under a different login user's home (e.g. an fnm/nvm-managed npm prefix) is unreachable from the service and fails at delegation time with `claude: command not found` (exit 127).
+- `scripts/vps-bootstrap.sh` and `scripts/vps-bootstrap-oci.sh` (section 6b) install all four CLIs into `~hermes/.local/bin`, and their generated `~/.hermes/.env` prepends that dir to the service PATH via the unit's `EnvironmentFile=`.
+- Quick check that the service (not your shell) can see them: `sudo -u hermes env PATH=/home/hermes/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin claude --version` (repeat per CLI).
+- Caveat: the hardened `templates/systemd/hermes.service` sets `ProtectHome=read-only` with `ReadWritePaths=/home/hermes/.hermes` only — a delegated CLI that writes state under `$HOME` (e.g. `~/.claude`, `~/.codex`) may need its state dir redirected into `~/.hermes/` (same pattern as the unit's `XDG_STATE_HOME` workaround) or an extra `ReadWritePaths=` entry.
+
 ## Procedure
 
 1. **Parse the task** — read `task`, `repo`, `escalate`; classify intent (refactor / bugfix / explore / dependency_audit).

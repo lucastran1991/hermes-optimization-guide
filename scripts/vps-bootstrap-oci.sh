@@ -29,6 +29,8 @@
 #   nodejs       : v20.x via NodeSource (only if `node` missing)
 #   hermes user  : new unprivileged system user
 #   hermes agent : via official installer, run AS the hermes user
+#   coding CLIs  : claude, opencode, codex, gemini — run AS the hermes user,
+#                  into ~hermes/.local/bin (required by coding-agent-delegate)
 #   systemd units: hermes.service, hermes-dashboard.service (enabled, not started)
 # Skipping (see diff above):
 #   caddy, ufw configuration/enable
@@ -114,6 +116,33 @@ if ! sudo -u hermes bash -c 'command -v hermes >/dev/null 2>&1'; then
 fi
 
 # ------------------------------------------------------------
+# 6b. Coding-agent CLIs (as hermes user)
+# ------------------------------------------------------------
+# The coding-agent-delegate skill (symlinked in section 7) shells out to
+# these CLIs via its delegation.routing table. They must be installed FOR
+# THE hermes USER and resolvable from the systemd service PATH — a copy
+# under another login user's home (e.g. an fnm-managed npm prefix) is
+# unreachable from the service and fails at delegation time with
+# `claude: command not found` (exit 127). Non-fatal: warns and continues.
+log "Installing coding-agent CLIs for the hermes user..."
+sudo -u hermes bash -c '
+  mkdir -p "$HOME/.local/bin"
+  export PATH="$HOME/.local/bin:$PATH"
+  command -v claude >/dev/null 2>&1 || \
+    curl -fsSL https://claude.ai/install.sh | bash || echo "[warn] claude install failed"
+  command -v opencode >/dev/null 2>&1 || \
+    curl -fsSL https://opencode.ai/install | bash || echo "[warn] opencode install failed"
+  # opencode installs to ~/.opencode/bin by default — link it into the one
+  # dir the service PATH exposes.
+  [ -x "$HOME/.opencode/bin/opencode" ] && \
+    ln -sfn "$HOME/.opencode/bin/opencode" "$HOME/.local/bin/opencode"
+  command -v codex >/dev/null 2>&1 || \
+    npm install -g --prefix "$HOME/.local" @openai/codex || echo "[warn] codex install failed"
+  command -v gemini >/dev/null 2>&1 || \
+    npm install -g --prefix "$HOME/.local" @google/gemini-cli || echo "[warn] gemini-cli install failed"
+' || warn "Some coding-agent CLIs failed to install — delegation tiers that route to them will be unavailable."
+
+# ------------------------------------------------------------
 # 7. Skill symlinks + config scaffolding
 # ------------------------------------------------------------
 log "Linking skills from the guide into ~hermes/.hermes/skills/..."
@@ -143,6 +172,10 @@ GOOGLE_API_KEY=
 # gateway only reads these flat env vars directly.
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_ALLOWED_USERS=
+# hermes.service loads this file via EnvironmentFile= — this PATH makes the
+# coding-agent CLIs in ~/.local/bin (section 6b) visible to the service.
+# systemd does not read shell profiles, so PATH must be set here.
+PATH=/home/hermes/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
 EOF
   chmod 600 /home/hermes/.hermes/.env
   chown hermes:hermes /home/hermes/.hermes/.env
