@@ -3,52 +3,71 @@
 # ------------------------------------------------------------
 # Paste into ~/.hermes/cron.yaml (or include via `cron_files:` in config.yaml).
 # All tasks below assume the matching skill is installed from skills/.
+#
+# Keep this file's job set/schedules/notify channel in sync with the
+# embedded `cron:` block in templates/config/production.yaml — the two are
+# independently maintained and will drift silently otherwise.
 # ------------------------------------------------------------
 
 - name: nightly-backup
   schedule: "0 3 * * *"            # Every day 3am local
   task: /nightly-backup s3://my-backups/hermes/ 30
-  notify: telegram_private
+  notify: telegram_dm
+
+- name: weekly-dep-audit
+  schedule: "0 9 * * 1"            # Mondays 9am — collides with weekly-cost-report below,
+  task: /weekly-dep-audit severity_floor=high  # accepted as-is (mirrors production.yaml's own
+  notify: telegram_dm                          # pre-existing same-time schedule)
+
+- name: weekly-cost-report
+  schedule: "0 9 * * 1"            # Mondays 9am
+  task: /cost-report window=7d format=markdown
+  notify: telegram_dm
 
 - name: weekly-mcp-audit
-  schedule: "0 9 * * 1"            # Mondays 9am
-  task: /audit-mcp
-  notify: telegram_private
+  schedule: "0 10 * * 1"           # Mondays 10am — collides with the bypass-audit job below,
+  task: /audit-mcp                 # accepted as-is (both are legitimate Monday-morning audits)
+  notify: telegram_dm
 
 - name: weekly-bypass-audit
   schedule: "0 10 * * 1"
   task: /audit-approval-bypass
-  notify: telegram_private
+  notify: telegram_dm
 
-- name: weekly-cost-report
-  schedule: "0 11 * * 1"
-  task: /cost-report window=7d format=markdown
-  notify: telegram_private
-
-- name: weekly-dep-audit
-  schedule: "0 12 * * 1"
-  task: /weekly-dep-audit severity_floor=high
-  notify: telegram_private
-
-- name: monthly-secret-rotation
+- name: monthly-rotate
   schedule: "0 4 1 * *"            # 1st of month, 4am
   task: /rotate-secrets webhook_hmac_*
-  notify: telegram_private
+  notify: telegram_dm
 
 - name: daily-injection-sweep
   schedule: "0 2 * * *"
   task: /audit-injection-attempts since=24h
-  notify: telegram_private
+  notify: telegram_dm
 
 - name: disk-watchdog
   schedule: "*/15 * * * *"
   mode: no_agent                    # v0.13: script-only, no LLM session
   command: >-
     df -h / | awk 'NR==2 && $5+0 > 85 {print "Disk usage high: "$5}'
-  notify: telegram_private
+  notify: telegram_dm
+
+# Part 5/7 hygiene reminders. `hermes curator enable` is a real native
+# scheduler but has no documented YAML config surface to drive from this
+# file; `/journey` is interactive-only with no headless mode at all. Both
+# entries below are scheduled REMINDERS pointing at the real CLI/TUI
+# commands — not a claim that this file automates either one.
+- name: monthly-skill-curator-reminder
+  schedule: "0 8 1 * *"
+  task: "Reminder: run `hermes curator run --dry-run` then `hermes curator run` to review skill-library duplicates/stale skills."
+  notify: telegram_dm
+
+- name: monthly-journey-reminder
+  schedule: "0 8 2 * *"
+  task: "Reminder: open `/journey` and prune any wrong or stale memory entries."
+  notify: telegram_dm
 
 # Optional — only if you have a newsroom / status page / etc.
 # - name: morning-digest
 #   schedule: "0 7 * * *"
 #   task: /news-digest topics=[hermes,mcp,llm-security]
-#   notify: telegram_private
+#   notify: telegram_dm

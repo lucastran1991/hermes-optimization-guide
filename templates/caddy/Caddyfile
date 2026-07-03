@@ -56,7 +56,11 @@ langfuse.yourdomain.com {
 	}
 }
 
-# Webhooks — no basicauth (signature-validated in Hermes), but rate-limited
+# Webhooks — no basicauth (Hermes validates the signature via WEBHOOK_SECRET).
+# Request-rate limiting is enforced by Hermes itself (platforms.webhook.extra.rate_limit,
+# default 30/min), not by Caddy. Caddy only adds the 1MB pre-auth body cap below —
+# a defense-in-depth layer for a caddy-ratelimit plugin (xcaddy build) is optional,
+# not required, since the request is already rate-limited once it reaches Hermes.
 hooks.yourdomain.com {
 	encode zstd gzip
 

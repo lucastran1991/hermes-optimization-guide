@@ -25,12 +25,14 @@ models:
       api_key: ${OPENAI_API_KEY}
 
 platforms:
+  # NOTE: hermes-agent has no per-platform trust tier — the `trust_label`
+  # field below was previously set on this platform but is not a real
+  # config key and was silently ignored. No equivalent mechanism exists.
   telegram:
     enabled: true
     # `${VAR}` templating is NOT expanded on this config path — set the
     # real values via env instead: TELEGRAM_BOT_TOKEN, TELEGRAM_ALLOWED_USERS
     # (comma-separated numeric IDs) in ~/.hermes/.env.
-    trust_label: high
     default_skill: default
     # Hermes has no multi-bot support (single token/allow_from per
     # platform) — a separate public/quarantined bot isn't currently possible.
@@ -42,31 +44,51 @@ memory:
     llm_model: google/gemini-3.1-flash
     embedding_model: openai/text-embedding-3-small
 
+# hermes-agent approval controls are TOP-LEVEL keys, not nested under
+# `security:`. The old nested block below previously implied a per-tool
+# approval matrix, a named-subagent bypass list (started empty), a custom
+# deny-list regex (rm -rf /, curl|sh, metadata IP, ssh key reads), and a
+# dedicated approval-channel setting always routed to DM — none of those
+# exist as config keys. Real handling (light-touch intent preserved via
+# `mode: smart` below — the closest real tier to the old auto-approve-reads
+# default; exact policy owned by hermes-agent):
+approvals:
+  mode: smart               # manual | smart | off (off == --yolo, session-scoped)
+  timeout: 60                # seconds before an unanswered request auto-rejects
+  cron_mode: deny            # deny | approve — dangerous command inside a cron job
+  mcp_reload_confirm: true
+  destructive_slash_confirm: true
+
+# Allow-list ONLY (root-level). Entries here PERMANENTLY allow a pattern the
+# operator already approved once. There is NO user-editable deny-list/regex
+# equivalent to the old per-tool deny pattern list. Built-in dangerous-
+# command detector + optional tirith below are the real defenses.
+command_allowlist: []
+
 security:
-  approval:
-    bypass_subagents: []               # Start empty; add after review
-    auto_approve_read: true
-    denylist:
-      - 'rm\s+-rf\s+/'
-      - 'curl\s+.+\|\s*(sh|bash)'
-      - '169\.254\.169\.254'           # AWS/GCP metadata IP
-      - 'cat\s+~?/?\.?ssh/'
-    require_approval:
-      - tool: github
-        actions: [create_pr, merge_pr, delete_branch]
-      - tool: terminal
-        actions: [exec]
-      - tool: any_mcp
-        sampling: true
-    approval_channel: telegram_dm       # Always DM, never group
-  secrets:
-    # Redaction is on by default in Hermes v0.13+; keep patterns explicit
-    # so hardened deployments know what is being scrubbed.
-    redaction_patterns:
-      - 'sk-[A-Za-z0-9]{40,}'           # OpenAI / Anthropic style
-      - 'xoxb-[A-Za-z0-9-]{40,}'        # Slack bot
-      - 'ghp_[A-Za-z0-9]{36}'           # GitHub PAT
-      - 'AKIA[0-9A-Z]{16}'              # AWS access key id
+  allow_private_urls: false
+  # Redaction is on by default in Hermes v0.13+ via this single toggle —
+  # NOT the old user-editable per-pattern regex list (sk-*, xoxb-*, ghp_*,
+  # AKIA*). Kept true so deployments know secrets are being scrubbed.
+  redact_secrets: true
+  tirith_enabled: true        # external pre-exec scanner (own binary + rule file)
+  tirith_path: tirith
+  tirith_timeout: 5
+  tirith_fail_open: true      # upstream default; set false for fail-closed on scanner error
+  website_blocklist:
+    enabled: false
+    domains: []
+    shared_files: []
+  acked_advisories: []
+  allow_lazy_installs: true
+  # NOTE: hermes-agent has no per-tool approval matrix, no user-editable
+  # deny-list regex, no separate approval-channel (approvals route to
+  # whichever channel the message came from), no per-server tools_allowlist,
+  # and no per-platform trust tier. Prior versions of this file implied all
+  # of these; they were silently ignored. Real defenses: the global
+  # approvals.mode gate above, the built-in dangerous-command detector,
+  # optional tirith, MCP-server auto-disable on suspicious entries, and
+  # OS-level isolation ("the only real security boundary is the OS").
 
 telemetry:
   level: info

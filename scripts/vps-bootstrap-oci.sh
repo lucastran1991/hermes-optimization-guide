@@ -65,7 +65,12 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
 # ------------------------------------------------------------
 if ! command -v node >/dev/null 2>&1; then
   log "Installing Node.js 20..."
-  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | \
+    gpg --dearmor -o /usr/share/keyrings/nodesource.gpg
+  echo "deb [signed-by=/usr/share/keyrings/nodesource.gpg] \
+    https://deb.nodesource.com/node_20.x nodistro main" \
+    > /etc/apt/sources.list.d/nodesource.list
+  apt-get update -qq
   apt-get install -y -qq nodejs
 fi
 

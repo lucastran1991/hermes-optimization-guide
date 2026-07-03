@@ -59,30 +59,30 @@ routing:
       model: xai/grok-4.3
 
 platforms:
+  # NOTE: hermes-agent has no per-platform trust tier — the `trust_label`
+  # field below was previously set per-platform (high/medium/untrusted), is not a
+  # real config key and was silently ignored. No equivalent mechanism
+  # exists; every inbound platform is gated equally by approvals.mode below.
   telegram:
     enabled: true
     # `${VAR}` templating is NOT expanded on this config path — the gateway
     # loader reads token/allow_from straight from raw YAML. Set the real
     # values via env instead: TELEGRAM_BOT_TOKEN, TELEGRAM_ALLOWED_USERS
     # (comma-separated numeric IDs) in ~/.hermes/.env.
-    trust_label: high
   discord:
     enabled: true
     bot_token: ${DISCORD_BOT_TOKEN}
-    trust_label: medium
     approval_in_dm_only: true
   slack:
     enabled: true
     signing_secret: ${SLACK_SIGNING_SECRET}
     bot_token: ${SLACK_BOT_TOKEN}
-    trust_label: medium
   google_chat:
     enabled: false                    # Enable after Workspace app + allowlists are configured
     project_id: ${GOOGLE_CLOUD_PROJECT}
     credentials_json: ${GOOGLE_CHAT_CREDENTIALS_JSON}
     allowed_spaces:
       - ${GOOGLE_CHAT_ADMIN_SPACE}
-    trust_label: medium
   teams:
     enabled: false                    # v0.14 end-to-end Graph/listener/delivery path
     tenant_id: ${MICROSOFT_TENANT_ID}
@@ -90,19 +90,16 @@ platforms:
     client_secret: ${MICROSOFT_TEAMS_CLIENT_SECRET}
     allowed_teams:
       - ${MICROSOFT_TEAMS_ADMIN_TEAM}
-    trust_label: medium
   line:
     enabled: false
     channel_access_token: ${LINE_CHANNEL_ACCESS_TOKEN}
     channel_secret: ${LINE_CHANNEL_SECRET}
     allowed_user_ids:
       - ${LINE_ADMIN_USER_ID}
-    trust_label: medium
   simplex:
     enabled: false
     profile: simplex-admin
     require_pairing: true
-    trust_label: medium
   email:
     enabled: true
     imap:
@@ -113,7 +110,6 @@ platforms:
       host: smtp.gmail.com
       user: "${EMAIL_USER}"
       password: "${EMAIL_APP_PASSWORD}"
-    trust_label: untrusted
 
 memory:
   backend: lightrag
@@ -131,32 +127,34 @@ context:
   preserve_last_k: 6
 
 mcp_servers:
+  # NOTE: hermes-agent has no user-settable `trust:` tier — the loader
+  # (`hermes_cli/mcp_security.py::validate_mcp_server_entry`) automatically
+  # force-disables MCP servers it flags as suspicious; there is no manual
+  # override, and no per-server `tools_allowlist` restriction mechanism
+  # exists either. Sampling control is real but a different shape: nested
+  # `sampling: { enabled }` per server, not a flat `allow_sampling` boolean.
   github:
     command: npx
     args: [-y, "@modelcontextprotocol/server-github"]
     env:
       GITHUB_PERSONAL_ACCESS_TOKEN: ${GITHUB_PAT}
-    trust: trusted
-    allow_sampling: false
-    tools_allowlist:
-      - get_pull_request
-      - list_pull_requests
-      - get_pull_request_diff
-      - create_issue
-      - add_issue_comment
-      - create_pull_request_review
+    sampling: { enabled: false }
+    # NOTE: no per-server tools_allowlist mechanism exists in hermes-agent;
+    # this entry previously implied restricting this server to
+    # [get_pull_request, list_pull_requests, get_pull_request_diff,
+    # create_issue, add_issue_comment, create_pull_request_review] — that
+    # intent isn't enforceable today. Real defenses: the approvals.mode
+    # gate + built-in dangerous-command detector + optional tirith below.
   postgres:
     command: npx
     args: [-y, "@modelcontextprotocol/server-postgres", "${POSTGRES_URL}"]
-    trust: trusted
-    allow_sampling: false
+    sampling: { enabled: false }
   cloudflare:
     command: npx
     args: [-y, "@cloudflare/mcp-server-cloudflare"]
     env:
       CLOUDFLARE_API_TOKEN: "${CLOUDFLARE_API_TOKEN}"
-    trust: trusted
-    allow_sampling: false
+    sampling: { enabled: false }
   filesystem:
     command: npx
     args:
@@ -164,7 +162,6 @@ mcp_servers:
       - "@modelcontextprotocol/server-filesystem"
       - ${HOME}/Documents
       - ${HOME}/Projects
-    trust: trusted
 
 # Tier-1 escalation: coding-agent-delegate's print-mode routing table.
 # See part18-coding-agents.md:108-123.
@@ -246,45 +243,61 @@ sandboxes:
                                      # part19-security-playbook.md:196 ("the agent cannot
                                      # read ~/.hermes/.env — keys stay on the host").
 
+# hermes-agent approval controls are TOP-LEVEL keys, not nested under
+# `security:`. This block previously implied a per-tool approval matrix
+# (github/terminal/email/twilio/any_mcp/delegate_task/kanban/sandbox), a
+# named-subagent bypass list, a custom deny-list regex, and a dedicated
+# approval-channel setting — none of those exist. Real handling:
+approvals:
+  mode: manual              # manual | smart | off (off == --yolo, session-scoped)
+  timeout: 60                # seconds before an unanswered request auto-rejects
+  cron_mode: deny            # deny | approve — dangerous command inside a cron job.
+                              # Replaces the old per-job `bypass_subagents` list
+                              # (nightly-backup/weekly-dep-audit/cost-report) —
+                              # this gate is global for all cron jobs, no
+                              # per-named-job bypass exists.
+  mcp_reload_confirm: true
+  destructive_slash_confirm: true
+
+# Allow-list ONLY (root-level). Entries here PERMANENTLY allow a pattern the
+# operator already approved once. There is NO user-editable deny-list/regex —
+# the old per-tool deny pattern list (rm -rf /, curl|sh, metadata IP, ssh key
+# reads, aws s3 sync, ssh-keyscan) has no config-schema equivalent. Built-in
+# dangerous-command detector + optional tirith below are the real defenses.
+command_allowlist: []
+
 security:
-  approval:
-    bypass_subagents:
-      - nightly-backup
-      - weekly-dep-audit
-      - cost-report
-    auto_approve_read: true
-    denylist:
-      - 'rm\s+-rf\s+/'
-      - 'curl\s+.+\|\s*(sh|bash)'
-      - '169\.254\.169\.254'
-      - 'cat\s+~?/?\.?ssh/'
-      - 'aws\s+s3\s+sync\s+.+\s+s3://'
-      - 'ssh-keyscan'
-    require_approval:
-      - { tool: github,  actions: [create_pr, merge_pr, delete_branch] }
-      - { tool: terminal, actions: [exec] }
-      - { tool: email,    actions: [send] }
-      - { tool: twilio,   actions: [send_sms] }
-      - { tool: any_mcp,  sampling: true }
-      # Structured, write-capable delegation surfaces — same risk class as
-      # `terminal` above, gated the same way. NOTE: `denylist` below is a regex
-      # match over terminal exec strings only; it does NOT see these structured
-      # tool calls — known gap, not addressed here.
-      - { tool: delegate_task, actions: [dispatch] }
-      - { tool: kanban,   actions: [create, assign] }
-      - { tool: sandbox,  actions: [start, stop] }
-    approval_channel: telegram_dm
-  secrets:
-    redaction_patterns:
-      - 'sk-[A-Za-z0-9]{40,}'
-      - 'xoxb-[A-Za-z0-9-]{40,}'
-      - 'ghp_[A-Za-z0-9]{36}'
-      - 'github_pat_[A-Za-z0-9_]{80,}'
-      - 'AKIA[0-9A-Z]{16}'
-    memory_write_redaction: true
-  webhook:
-    require_signature: true
-    max_body_bytes: 1048576
+  allow_private_urls: false
+  redact_secrets: true        # single on/off toggle (built-in detectors); NOT
+                               # the old user-editable per-pattern regex list
+                               # (sk-*, xoxb-*, ghp_*, github_pat_*, AKIA*)
+  tirith_enabled: true        # external pre-exec scanner (own binary + rule file)
+  tirith_path: tirith
+  tirith_timeout: 5
+  tirith_fail_open: true      # true = allow on scanner error; false = fail-closed
+  website_blocklist:
+    enabled: false
+    domains: []
+    shared_files: []
+  acked_advisories: []
+  allow_lazy_installs: true
+  # NOTE: hermes-agent has no per-tool approval matrix, no user-editable
+  # deny-list regex, no separate approval-channel (approvals route to
+  # whichever channel the message came from), no per-server tools_allowlist,
+  # and no per-platform trust tier. Prior versions of this file implied all
+  # of these; they were silently ignored. Real defenses: the global
+  # approvals.mode gate above, the built-in dangerous-command detector,
+  # optional tirith, MCP-server auto-disable on suspicious entries, and
+  # OS-level isolation ("the only real security boundary is the OS").
+
+# Webhook signing is via the WEBHOOK_SECRET env var or a per-route `secret:`,
+# not a `security.webhook.*` config block (old require_signature/max_body_bytes
+# implied one). hermes-agent's own webhook adapter (not Caddy) enforces
+# platforms.webhook.extra.rate_limit (default 30/min) and
+# platforms.webhook.extra.max_body_bytes (default 1MB) when a
+# `platforms.webhook` section is configured — this template doesn't configure
+# one today; noting the real mechanism here, not adding the section. There is
+# no `ttl_seconds` equivalent (webhook staleness has no config-schema knob).
 
 telemetry:
   level: info
@@ -298,6 +311,9 @@ telemetry:
     tokens_per_turn: 30000
     webhook: ${ALERT_WEBHOOK_URL}
 
+# Keep this block's job set/schedules/notify channel in sync with
+# templates/cron/production-crons.yaml — the two are independently
+# maintained and will drift silently otherwise.
 cron:
   - { name: nightly-backup,     schedule: "0 3 * * *",   task: "/nightly-backup s3://backups/hermes/ 30", notify: telegram_dm }
   - { name: weekly-dep-audit,   schedule: "0 9 * * 1",   task: "/weekly-dep-audit severity_floor=high",   notify: telegram_dm }

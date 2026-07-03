@@ -13,20 +13,33 @@
 
 version: 1
 
-profile: quarantine                     # Default to quarantine; explicit /trusted to leave
+# NOTE: the `profile:`/`profiles: {quarantine,trusted}` scaffold below has
+# ZERO backing in hermes-agent's config loader — grepping DEFAULT_CONFIG for
+# "profiles"/"profile" as a config-schema key returns no hits, and this
+# file's own referenced `/trusted` slash command doesn't exist either. This
+# is not just the nested per-profile security sub-key (see below) — the
+# WHOLE selector + per-profile dict is non-functional today; setting
+# `profile: quarantine` or `profile: trusted` on a platform does nothing.
+# The real, unrelated `profiles` feature in hermes-agent is
+# `hermes_cli/profiles.py`'s directory-based `hermes -p <name>` mechanism
+# (separate config dirs per named instance), not a runtime trust-tier
+# switch. For actual multi-tier isolation, run two `hermes -p <name>`
+# processes with two separate config files (e.g. this security-hardened.yaml
+# for the untrusted-facing instance, a separate config for the admin
+# instance) instead of relying on this scaffold.
+profile: quarantine                     # Non-functional selector — intent-only, see NOTE above
 
 profiles:
   quarantine:
     description: Untrusted-input-facing. Cheap model, approval on everything, no memory writes.
     models: { default: google/gemini-3.1-flash }
-    tools_allowlist: [classify, reply, escalate]
+    # Intent was to restrict this profile's tool surface to
+    # [classify, reply, escalate] via a per-profile allowlist key — no such
+    # per-profile (or per-server) tool-restriction mechanism exists.
     memory: { write: false, read: true }
-    security:
-      approval:
-        bypass_subagents: []
-        auto_approve_read: false        # Even reads require approval here
-        require_approval:
-          - { tool: "*", actions: [exec, write, send, create, update, delete] }
+    # hermes-agent has no per-profile security override — the top-level
+    # approvals:/security: block below governs the whole process regardless
+    # of which (non-functional) profile is selected above.
   trusted:
     description: Admin-only. Full capability.
     models: { default: anthropic/claude-sonnet-5 }
@@ -57,42 +70,63 @@ platforms:
     bot_token: ${DISCORD_BOT_TOKEN}
     profile: quarantine
 
+# hermes-agent approval controls are TOP-LEVEL keys, not nested under
+# `security:`. The old nested block below previously implied a per-tool
+# approval matrix, an empty-by-design named-subagent bypass list, a custom
+# deny-list regex (rm -rf /, curl|sh, metadata IP, ssh key reads, aws s3
+# sync, scp, netcat listener, base64|bash), and a dedicated approval-channel
+# setting with its own timeout — none of those exist as config keys. Real
+# handling (strict/quarantine intent preserved via `mode: manual` below):
+approvals:
+  mode: manual              # manual | smart | off (off == --yolo, session-scoped)
+  timeout: 60                # seconds before an unanswered request auto-rejects
+  cron_mode: deny            # deny | approve — dangerous command inside a cron job
+  mcp_reload_confirm: true
+  destructive_slash_confirm: true
+
+# Allow-list ONLY (root-level). Entries here PERMANENTLY allow a pattern the
+# operator already approved once. There is NO user-editable deny-list/regex
+# equivalent to the old per-tool deny pattern list. Built-in dangerous-
+# command detector + optional tirith below are the real defenses.
+command_allowlist: []
+
 security:
-  approval:
-    bypass_subagents: []                # Empty by design
-    auto_approve_read: false            # Even directory listings require approval
-    denylist:
-      - 'rm\s+-rf\s+/'
-      - 'curl\s+.+\|\s*(sh|bash)'
-      - '169\.254\.169\.254'
-      - 'cat\s+~?/?\.?ssh/'
-      - 'aws\s+s3\s+sync'
-      - 'scp\s+.+@'
-      - 'nc\s+-l'
-      - 'base64\s+-d.*\|.*bash'
-    require_approval:
-      - { tool: "*", actions: [exec, write, send, create, update, delete, post] }
-    approval_channel: telegram_dm
-    approval_timeout_seconds: 300       # Reject if operator doesn't respond
-  secrets:
-    # Redaction is on by default in Hermes v0.13+; keep patterns explicit
-    # for auditability and memory/log hygiene.
-    redaction_patterns:
-      - 'sk-[A-Za-z0-9]{40,}'
-      - 'xoxb-[A-Za-z0-9-]{40,}'
-      - 'ghp_[A-Za-z0-9]{36}'
-      - 'github_pat_[A-Za-z0-9_]{80,}'
-      - 'AKIA[0-9A-Z]{16}'
-      - 'eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+'     # JWT
-    memory_write_redaction: true
-    log_redaction: true
-  webhook:
-    require_signature: true
-    max_body_bytes: 524288
-    ttl_seconds: 300                    # Reject webhooks older than 5 min
-  mcp:
-    default_trust: untrusted            # Must be explicitly elevated per-server
-    require_allowlist: true
+  allow_private_urls: false
+  # Redaction is on by default in Hermes v0.13+ via this single toggle —
+  # NOT the old user-editable per-pattern regex list (sk-*, xoxb-*, ghp_*,
+  # github_pat_*, AKIA*, JWT). Kept true for auditability/log hygiene intent.
+  redact_secrets: true
+  tirith_enabled: true        # external pre-exec scanner (own binary + rule file)
+  tirith_path: tirith
+  tirith_timeout: 5
+  tirith_fail_open: false     # stricter than upstream default: fail CLOSED on scanner error
+  website_blocklist:
+    enabled: false
+    domains: []
+    shared_files: []
+  acked_advisories: []
+  allow_lazy_installs: true
+  # NOTE: hermes-agent has no per-tool approval matrix, no user-editable
+  # deny-list regex, no separate approval-channel (approvals route to
+  # whichever channel the message came from), no per-server tools_allowlist,
+  # and no per-platform trust tier. Prior versions of this file implied all
+  # of these; they were silently ignored. Real defenses: the global
+  # approvals.mode gate above, the built-in dangerous-command detector,
+  # optional tirith, MCP-server auto-disable on suspicious entries, and
+  # OS-level isolation ("the only real security boundary is the OS").
+
+# Webhook signing is via the WEBHOOK_SECRET env var or a per-route `secret:`,
+# not a `security.webhook.*` config block (old require_signature/max_body_bytes/
+# ttl_seconds implied one). hermes-agent's own webhook adapter (not Caddy)
+# enforces platforms.webhook.extra.rate_limit (default 30/min) and
+# platforms.webhook.extra.max_body_bytes (default 1MB) when a
+# `platforms.webhook` section is configured — this template doesn't configure
+# one today. There is no `ttl_seconds` equivalent (webhook staleness has no
+# config-schema knob).
+#
+# MCP trust is automatic (validate_mcp_server_entry force-disables suspicious
+# servers) — there is no user-set default-trust tier or per-server tool
+# allow-list to require, so the old mcp: sub-block above has no equivalent.
 
 telemetry:
   level: info
