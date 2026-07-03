@@ -70,6 +70,16 @@ RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 # System calls
 SystemCallFilter=@system-service
 SystemCallFilter=~@privileged @resources @mount @cpu-emulation @debug @reboot @swap
+# Bun-compiled coding CLIs (claude, opencode — installed for the
+# coding-agent-delegate skill, see vps-bootstrap*.sh section 6b) call
+# sched_setscheduler() during normal runtime startup, before running any
+# user code. It's part of @resources, denied above, so the default kill
+# action fires immediately (SIGSYS, "Bad system call") on every invocation,
+# even --version. CapabilityBoundingSet= is empty, so this still can't grant
+# real-time priority or touch other processes (EPERM without CAP_SYS_NICE) —
+# re-allowing just this one syscall doesn't reopen what @resources exists
+# to block.
+SystemCallFilter=sched_setscheduler
 SystemCallArchitectures=native
 
 # Memory / file descriptor limits
