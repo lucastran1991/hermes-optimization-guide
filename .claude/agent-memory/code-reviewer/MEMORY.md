@@ -1,0 +1,1 @@
+- [Skill-doc vs template drift](project_skill-doc-vs-template-drift.md) — SKILL.md quotes guide chapters verbatim; can drift from hardened templates/config/*.yaml. Check both.
