@@ -8,12 +8,12 @@
 [![Hermes](https://img.shields.io/badge/Hermes-v0.18.0%20%282026.7.1%29-9146FF)](https://github.com/NousResearch/hermes-agent/releases/tag/v2026.7.1)
 [![Last updated](https://img.shields.io/badge/Last%20updated-2026--07--01-brightgreen)](./CHANGELOG.md)
 [![Parts](https://img.shields.io/badge/parts-27-blue)](#table-of-contents)
-[![Skills](https://img.shields.io/badge/installable%20skills-13-blue)](./skills/)
+[![Skills](https://img.shields.io/badge/installable%20skills-14-blue)](./skills/)
 [![Configs](https://img.shields.io/badge/config%20templates-5-blue)](./templates/config/)
 [![CI](https://github.com/OnlyTerp/hermes-optimization-guide/actions/workflows/ci.yml/badge.svg)](./.github/workflows/ci.yml)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
-> **Current through Hermes Agent v0.18.0 (v2026.7.1) — "The Judgment Release"** · **27 parts, 13 installable guide skills, 5 opinionated configs, 4 reference architectures, one-command VPS bootstrap** · Now covering **Mixture-of-Agents as a first-class model**, evidence-based **verification** + `/goal` completion contracts, **`/learn` + `/journey`** self-improvement, **background subagent fan-out**, the maturing **Desktop app** (Projects, memory graph, multi-terminal), **iMessage via Photon** (no Mac needed), the NVIDIA RTX / DGX Spark local-hardware story, and gateway **scale-to-zero** for teams. **Bring any model** — this guide is about the *harness*, not the weights.
+> **Current through Hermes Agent v0.18.0 (v2026.7.1) — "The Judgment Release"** · **27 parts, 14 installable guide skills, 5 opinionated configs, 4 reference architectures, one-command VPS bootstrap** · Now covering **Mixture-of-Agents as a first-class model**, evidence-based **verification** + `/goal` completion contracts, **`/learn` + `/journey`** self-improvement, **background subagent fan-out**, the maturing **Desktop app** (Projects, memory graph, multi-terminal), **iMessage via Photon** (no Mac needed), the NVIDIA RTX / DGX Spark local-hardware story, and gateway **scale-to-zero** for teams. **Bring any model** — this guide is about the *harness*, not the weights.
 >
 > Other languages: [中文](./README-zh.md) · [日本語](./README-ja.md) · [Tiếng Việt](./README-vi.md)
 
@@ -60,7 +60,7 @@ Prefer a 5-minute local-only setup? → **[docs/quickstart.md](./docs/quickstart
 
 | Folder | What's in it |
 |---|---|
-| [`skills/`](./skills) | **13 installable `SKILL.md`** files. `ln -s` into `~/.hermes/skills/` and they're live. |
+| [`skills/`](./skills) | **14 installable `SKILL.md`** files. `ln -s` into `~/.hermes/skills/` and they're live. |
 | [`templates/config/`](./templates/config) | **5 opinionated `config.yaml`** — minimum, telegram-bot, production, cost-optimized, security-hardened. |
 | [`templates/compose/`](./templates/compose) | Self-hosted Langfuse v3 stack (ClickHouse + MinIO + Redis). |
 | [`templates/caddy/`](./templates/caddy) | Caddyfile reference (reverse proxy + auto TLS + HSTS). |

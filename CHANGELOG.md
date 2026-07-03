@@ -2,6 +2,22 @@
 
 Dated list of meaningful guide updates. Roughly [Keep a Changelog](https://keepachangelog.com) flavored.
 
+## 2026-07-03 — Coding-Agent Delegation Skill
+
+### Added
+- **`dev/coding-agent-delegate`** skill: tiered delegation for coding tasks — a
+  quick print-mode CLI call for small jobs, escalating to a durable Kanban
+  lane for longer-running work, and further to a remote sandbox when the task
+  needs an isolated execution environment.
+- `templates/config/production.yaml` gains `delegation` (default agent +
+  routing rules matched on task type, files-changed count, repo size, and
+  budget), `acp` (client-only bindings for claude-code/codex/gemini-cli/
+  opencode, dispatched by `delegation.routing`), and `sandboxes` (SSH-backed
+  `dev-box` with push/pull sync) blocks, plus `security.approval.require_approval`
+  entries gating `delegate_task`, `kanban`, and `sandbox` actions behind
+  approval. The sandbox sync config also excludes `.env` from `sandboxes.dev-box.sync.ignore`
+  so `~/.hermes/.env` provider keys never get pushed to the remote host.
+
 ## 2026-07-01 — Hermes v0.17.0 "Reach" + v0.18.0 "Judgment" Refresh
 
 ### Added
