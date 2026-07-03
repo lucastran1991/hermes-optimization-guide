@@ -2,6 +2,28 @@
 
 Dated list of meaningful guide updates. Roughly [Keep a Changelog](https://keepachangelog.com) flavored.
 
+## 2026-07-03 — Curator + Memory Hygiene Reminders & Meeting-Prep Memory Discipline
+
+### Added
+- `templates/config/production.yaml`'s `cron:` list gains two hygiene
+  reminders: `monthly-skill-curator-reminder` (Part 5 / v0.12 — nudges the
+  operator to run `hermes curator run --dry-run`/`hermes curator run`
+  manually) and `monthly-journey-reminder` (Part 7 / v0.18 — nudges a
+  monthly `/journey` pass). Both are scheduled **reminders**, not
+  automation: neither Curator nor `/journey` has a documented headless
+  mode, so these are calendar nudges pointing at the real interactive
+  commands, not a new config schema.
+- `skills/dev/meeting-prep/SKILL.md` gains a `## Memory discipline` section:
+  the repo's only memory-toolset skill now documents what to persist (durable
+  attendee facts) vs. what to recall via `session_search` (per-meeting task
+  state), closing the Part 7 save/don't-save gap.
+
+### Notes
+- No new skill, no `ALLOWED_TOOLSETS` change, no `security-hardened.yaml`
+  change (deferred as a documented 2-line follow-up) — both reminders are
+  admin-only scheduled cron entries, not tool surfaces requiring approval
+  gating.
+
 ## 2026-07-03 — Coding-Agent Delegation Skill
 
 ### Added
