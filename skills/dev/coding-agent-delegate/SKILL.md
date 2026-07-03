@@ -23,6 +23,14 @@ parameters:
     type: string
     enum: [auto, print, kanban, sandbox]
     default: auto
+  harness:
+    type: string
+    enum: [bare, ccs]
+    default: bare
+    description: "bare = plain `claude` (default — works with zero extra setup). ccs = route claude-code through `ccs <profile>` for a scoped delegation identity; only grants CK harness if ClaudeKit is separately provisioned on this host (see Prerequisites). Opt in only after Phase 1's smoke-test gate passes. No-op for codex/gemini-cli/opencode."
+  parallel:
+    type: integer
+    description: "Number of subtasks to fan out concurrently within one delegate_code call. Each subtask runs in its own git worktree (see Git Hygiene). Optional — omit for a single-subtask delegation."
 ---
 
 # coding-agent-delegate — Tiered Coding-Agent Delegation
@@ -37,6 +45,7 @@ The routing table below shells out to external CLIs: `claude` (claude-code), `co
 - `scripts/vps-bootstrap.sh` and `scripts/vps-bootstrap-oci.sh` (section 6b) install all four CLIs into `~hermes/.local/bin`, and their generated `~/.hermes/.env` prepends that dir to the service PATH via the unit's `EnvironmentFile=`.
 - Quick check that the service (not your shell) can see them: `sudo -u hermes env PATH=/home/hermes/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin claude --version` (repeat per CLI).
 - Caveat: the hardened `templates/systemd/hermes.service` sets `ProtectHome=read-only` with `ReadWritePaths=/home/hermes/.hermes` only — a delegated CLI that writes state under `$HOME` (e.g. `~/.claude`, `~/.codex`) may need its state dir redirected into `~/.hermes/` (same pattern as the unit's `XDG_STATE_HOME` workaround) or an extra `ReadWritePaths=` entry.
+- **`ccs` — required only when `harness: ccs` is used.** `scripts/vps-bootstrap.sh` / `-oci.sh` install `ccs@8.7.0` alongside the other four CLIs. Before flipping any delegation to `harness: ccs`, complete the one-time profile-provisioning step: run the interactive wizard `ccs api create` (preferred over the `--api-key` command-line form, which leaves the key in shell history/process args) to create the profile named in `templates/config/production.yaml`'s `delegation.ccs_profile` field (see that file's provisioning comment). `templates/systemd/hermes.service`'s `ReadWritePaths=/home/hermes/.ccs` (Phase 1) must already be in place for the profile's state to persist. Confirm the profile actually works with Phase 1's manual smoke-test gate — `ccs "<ccs_profile>" -p "echo ok" --output-format json` must exit 0 with valid JSON — **before** enabling `harness: ccs` anywhere; there is no automatic fallback to `bare` on failure. **ClaudeKit itself (the `~/.claude/` bundle) is a separate prerequisite this guide does not install** — `harness: ccs` without it produces identical (zero-harness) behavior to `harness: bare`.
 
 ## Procedure
 
@@ -69,6 +78,14 @@ The routing table below shells out to external CLIs: `claude` (claude-code), `co
    ```
    `/delegate_task` selects the ACP client per routing rules and streams progress back over a single WebSocket.
 
+   These two examples use the **default `harness: bare`** — no change to today's behavior.
+
+   Before switching to `harness: ccs`, note: (a) print mode (`-p`) is already non-interactive — no separate "auto"/unattended flag is needed on the inner call; (b) harness (whether `~/.claude/CLAUDE.md` + rules + skills catalog + hooks load) depends on `~/.claude/` existing on **the host**, not on choosing `ccs` over `bare` — both wrap the same `claude` binary and get identical harness on a given machine. Don't walk away assuming `harness: ccs` alone solves it; see Prerequisites. With that understood, the opt-in `harness: ccs` variant routes the same call through a scoped delegation identity/profile (separate API key, quota, and audit trail from a human's own CCS session), only after Phase 1's smoke-test gate has passed:
+   ```bash
+   ccs "<ccs_profile>" -p "..." --allowedTools "Read,Edit,Bash" --max-turns 20 --output-format json
+   ```
+   `<ccs_profile>` stands for whatever `delegation.ccs_profile` (`templates/config/production.yaml`) currently holds — this is illustrative, not literal executable syntax; the Hermes gateway substitutes the real value at dispatch time.
+
 3. **Detect escalation signals** — long-running / needs human review / multi-handoff → tier 2; needs isolation / heavy compute / untrusted deps → tier 3.
 
 4. **Tier 2 — Kanban lane** — create a durable card:
@@ -86,7 +103,7 @@ The routing table below shells out to external CLIs: `claude` (claude-code), `co
    /sandbox stop dev-box                # Syncs changes back, then stops
    ```
 
-6. **Git hygiene** — isolate one branch/worktree per delegation (per part18's "Git Hygiene When Agents Share a Workspace" section) so parallel agents never clobber each other.
+6. **Git hygiene** — isolate one branch/worktree per delegation (per part18's "Git Hygiene When Agents Share a Workspace" section) so parallel agents never clobber each other. When fanning out `parallel` subtasks against the **same repo with the same agent** (e.g. multiple `ccs <profile> -p` calls), branch naming alone is not enough — concurrent processes sharing one working tree race on file writes even if each targets a different branch in its commit message. Give each subtask its own `git worktree add ../subtask-N <branch-N>` checkout, and run the delegation inside that worktree's directory.
 
 ## Escalation tiers
 
@@ -157,6 +174,16 @@ sandboxes:
 /delegate_code "refactor src/auth to JWT rotation" repo=myorg/app escalate=kanban
 /delegate_code "run full e2e suite" repo=myorg/app escalate=sandbox
 ```
+
+`parallel` example — fan out subtasks concurrently within one `delegate_code` call, opted into `harness: ccs`, one worktree per subtask:
+
+```
+/delegate_code "add tests for src/payments/, split into 3 subtasks" repo=myorg/app harness=ccs parallel=3
+  → 3x, each in its own worktree (git worktree add ../subtask-N devin/claude-code-<ts>-subtask-N):
+     ccs ccs-hermes -p "<subtask N>" --allowedTools "Read,Edit,Bash" --max-turns 20 --output-format json
+```
+
+One CCS profile can serve concurrent calls, but the actual throughput ceiling is unverified (`@kaitranntt/ccs`'s `proper-lockfile` dependency suggests possible serialization) — test on your deployment before assuming `N` is unbounded.
 
 ## See also
 

@@ -9,7 +9,7 @@
 #   1. Creates a non-root `hermes` user
 #   2. Installs prereqs: curl, jq, git, python3-venv, nodejs, age, rclone, ufw, fail2ban
 #   3. Installs Hermes via official installer
-#   3b. Installs coding-agent CLIs (claude, opencode, codex, gemini) as hermes
+#   3b. Installs coding-agent CLIs (claude, opencode, codex, gemini, ccs) as hermes
 #   4. Sets up Caddy (reverse proxy + auto TLS)
 #   5. Sets up UFW (22, 80, 443 only) + fail2ban
 #   6. Installs the guide repo at /opt/hermes-optimization-guide
@@ -124,6 +124,8 @@ sudo -u hermes bash -c '
     npm install -g --prefix "$HOME/.local" @openai/codex || echo "[warn] codex install failed"
   command -v gemini >/dev/null 2>&1 || \
     npm install -g --prefix "$HOME/.local" @google/gemini-cli || echo "[warn] gemini-cli install failed"
+  command -v ccs >/dev/null 2>&1 || \
+    npm install -g --prefix "$HOME/.local" @kaitranntt/ccs@8.7.0 || echo "[warn] ccs install failed"
 ' || warn "Some coding-agent CLIs failed to install — delegation tiers that route to them will be unavailable."
 
 # ------------------------------------------------------------

@@ -41,6 +41,10 @@ opencode auth                     # BYOK
 
 # Aider
 pipx install aider-chat
+
+# CCS (Claude Code Switch — only if using `harness: ccs`)
+npm install -g @kaitranntt/ccs@8.7.0
+ccs api create                    # Interactive profile setup
 ```
 
 Verify from inside Hermes:
@@ -78,6 +82,14 @@ claude -p "refactor src/auth/ to use the new JWT rotation helper" \
 
 Captures the JSON, parses the file diff, posts a summary back to your Telegram/Discord/Slack thread with a link to the git diff.
 
+### CCS Routing (Optional, Claude Code Only)
+
+If you already use ClaudeKit + CCS for human Claude Code sessions, you can route delegation through the same identity system for a scoped delegation profile — separate API key, quota, and audit trail from your personal CCS session.
+
+The `coding-agent-delegate` skill's `claude-code` branch supports an opt-in `harness: ccs` parameter (default stays `harness: bare`) that routes through `ccs <profile> -p "..."` instead of bare `claude -p`. This gives you audit isolation when delegating to a shared Hermes instance.
+
+**Important caveat:** `harness: ccs` alone does NOT grant ClaudeKit harness on this host. Harness (whether `~/.claude/CLAUDE.md` + rules + skills catalog + hooks load) depends on ClaudeKit being separately installed and configured on the Hermes machine. Both `harness: bare` and `harness: ccs` produce identical zero-harness behavior if `~/.claude/` does not exist. See the [skill's Prerequisites](./skills/dev/coding-agent-delegate/SKILL.md) for the one-time CCS profile setup and smoke-test gate before enabling `harness: ccs` anywhere.
+
 ### Parallel Delegation
 
 Need three things done? Fire all three at once:
@@ -90,6 +102,17 @@ In parallel:
 ```
 
 Hermes runs them in three independent subagent slots, streams progress, and aggregates.
+
+A second pattern: the same agent (claude-code), routed through one CCS profile, each subtask in its own git worktree to avoid file-lock conflicts:
+
+```
+/delegate_code "add tests for src/payments/, split into 3 subtasks" \
+  repo=myorg/app \
+  harness=ccs \
+  parallel=3
+```
+
+This fans out 3 subtasks, each running `ccs ccs-hermes -p` in its own worktree checkout (`git worktree add ../subtask-N devin/claude-code-<ts>-subtask-N`). The [skill's `parallel` worked example](./skills/dev/coding-agent-delegate/SKILL.md) shows the full pattern. One caveat: the actual throughput ceiling (whether you can safely spawn 3, 5, or 10 concurrent calls against a single CCS profile) is unverified on your deployment — test before assuming unbounded parallelism.
 
 ### Cost-Routing by Task Type
 

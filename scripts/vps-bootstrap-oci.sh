@@ -29,7 +29,7 @@
 #   nodejs       : v20.x via NodeSource (only if `node` missing)
 #   hermes user  : new unprivileged system user
 #   hermes agent : via official installer, run AS the hermes user
-#   coding CLIs  : claude, opencode, codex, gemini — run AS the hermes user,
+#   coding CLIs  : claude, opencode, codex, gemini, ccs — run AS the hermes user,
 #                  into ~hermes/.local/bin (required by coding-agent-delegate)
 #   systemd units: hermes.service, hermes-dashboard.service (enabled, not started)
 # Skipping (see diff above):
@@ -140,6 +140,8 @@ sudo -u hermes bash -c '
     npm install -g --prefix "$HOME/.local" @openai/codex || echo "[warn] codex install failed"
   command -v gemini >/dev/null 2>&1 || \
     npm install -g --prefix "$HOME/.local" @google/gemini-cli || echo "[warn] gemini-cli install failed"
+  command -v ccs >/dev/null 2>&1 || \
+    npm install -g --prefix "$HOME/.local" @kaitranntt/ccs@8.7.0 || echo "[warn] ccs install failed"
 ' || warn "Some coding-agent CLIs failed to install — delegation tiers that route to them will be unavailable."
 
 # ------------------------------------------------------------

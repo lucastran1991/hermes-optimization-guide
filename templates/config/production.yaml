@@ -182,6 +182,18 @@ delegation:
     - match: { budget: low }
       agent: opencode               # budget-constrained edits → OpenCode + cheap model
       model: moonshot/kimi-k2.6
+  # CCS profile Tier 1 delegates as when coding-agent-delegate routes through CCS
+  # (see skills/dev/coding-agent-delegate/SKILL.md — `harness: ccs`). Getting
+  # actual CK harness ALSO requires ClaudeKit installed on this host (out of
+  # this guide's scope) — routing through CCS alone does not grant it. Must be
+  # an already-provisioned profile; provision once with the interactive wizard
+  # (`ccs api create` — prompts for the key, avoids leaking it via shell
+  # history/ps) or, less safely, non-interactively:
+  #   ccs api create --preset anthropic --api-key <ANTHROPIC_API_KEY> \
+  #     --target claude --yes ccs-hermes   # visible in `ps`/history — prefer the wizard
+  # An API profile (not an account profile like ccs auth create) avoids the
+  # interactive OAuth login step account profiles require.
+  ccs_profile: ccs-hermes
 
 # ACP client bindings dispatched by delegation.routing above.
 # Source: part18-coding-agents.md:188-204.

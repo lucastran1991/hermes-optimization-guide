@@ -2,6 +2,25 @@
 
 Dated list of meaningful guide updates. Roughly [Keep a Changelog](https://keepachangelog.com) flavored.
 
+## 2026-07-03 — CCS-Routed Coding-Agent Delegation (Opt-In)
+
+### Added
+- `skills/dev/coding-agent-delegate/SKILL.md` gains `harness` (`bare` default /
+  `ccs` opt-in) and `parallel` parameters: Tier 1's `claude-code` branch can
+  optionally route through `ccs <profile> -p` for a scoped delegation identity
+  (note: this alone does not grant ClaudeKit harness — that needs a separate,
+  out-of-scope ClaudeKit install on the host), plus a same-agent-type parallel
+  worked example using isolated git worktrees.
+- `templates/config/production.yaml` gains `delegation.ccs_profile`.
+- `scripts/vps-bootstrap.sh`/`-oci.sh` install `ccs` as a 5th coding-agent CLI
+  (pinned `@8.7.0`); `templates/systemd/hermes.service` `ReadWritePaths`
+  extended to `~/.ccs` (documented as an accepted, unresolved trust widening —
+  see the skill's Security Considerations).
+
+### Changed
+- `part18-coding-agents.md` documents optional CCS routing + the
+  same-agent-type worktree-isolated parallel pattern.
+
 ## 2026-07-03 — Curator + Memory Hygiene Reminders & Meeting-Prep Memory Discipline
 
 ### Added

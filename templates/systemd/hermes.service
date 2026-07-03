@@ -39,7 +39,10 @@ SyslogIdentifier=hermes
 # Filesystem
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/home/hermes/.hermes /tmp
+# /home/hermes/.ccs holds per-profile CCS state (credentials, session
+# history, job queue) needed by the coding-agent-delegate skill's
+# CCS-routed Tier 1.
+ReadWritePaths=/home/hermes/.hermes /home/hermes/.ccs /tmp
 PrivateTmp=true
 PrivateDevices=true
 

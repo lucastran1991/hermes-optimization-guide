@@ -39,7 +39,7 @@ hermes /reload
 | **dev** | `pr-review` | Delegates a PR review to Claude Code with a scoped read-only GitHub PAT |
 | **dev** | `release-notes` | Builds a human-readable release note from a range of commits or merged PRs |
 | **dev** | `meeting-prep` | Pulls context for an upcoming meeting (calendar + notes + recent threads) into a briefing |
-| **dev** | `coding-agent-delegate` | Delegates a coding task to a CLI agent, escalating to a durable Kanban lane or a remote sandbox as the work demands |
+| **dev** | `coding-agent-delegate` | Delegates a coding task to a CLI agent, escalating to a durable Kanban lane or a remote sandbox as the work demands; optional CCS-routed identity for Claude Code |
 | **ops** | `daily-inbox-triage` | Morning pass across Telegram/email/Slack DMs — classifies, autoreplies, escalates |
 | **ops** | `hermes-weekly` | Weekly digest of your Hermes activity (skills run, cost, errors, upcoming crons) |
 | **security** | `spam-trap` | Sinks confirmed spam into a quarantine profile with no memory write / no MCP access |
