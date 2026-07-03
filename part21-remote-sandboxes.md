@@ -71,6 +71,10 @@ sandboxes:
         - node_modules
         - __pycache__
         - "*.log"
+        - .env                      # Excludes ~/.hermes/.env — without this, `push: ~/.hermes`
+                                     # above syncs live provider API keys to the remote
+                                     # sandbox host. See part19-security-playbook.md
+                                     # ("keys stay on the host").
 ```
 
 ### Use It
