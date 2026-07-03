@@ -41,6 +41,8 @@ jobs:
           python-version: '3.11'
       - name: Install deps
         run: pip install pyyaml
+      - name: Run validator unit tests
+        run: python .github/scripts/test_validate_skills.py
       - name: Validate every SKILL.md frontmatter
         run: python .github/scripts/validate_skills.py
 

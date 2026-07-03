@@ -26,6 +26,8 @@ ALLOWED_TOOLSETS = {
     "discord",
     "slack",
     "memory",
+    "kanban",
+    "sandbox",
 }
 
 FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---", re.DOTALL)
@@ -43,11 +45,9 @@ def extract_frontmatter(p: pathlib.Path) -> dict | None:
         return None
 
 
-def validate(p: pathlib.Path) -> list[str]:
+def validate_frontmatter(fm: dict) -> list[str]:
+    """Check frontmatter dict against the skill rules. Pure function, no file I/O."""
     errs: list[str] = []
-    fm = extract_frontmatter(p)
-    if fm is None:
-        return ["missing or unparseable frontmatter"]
 
     missing = REQUIRED_KEYS - set(fm.keys())
     if missing:
@@ -70,6 +70,13 @@ def validate(p: pathlib.Path) -> list[str]:
         errs.append("description must be a >=10-char string")
 
     return errs
+
+
+def validate(p: pathlib.Path) -> list[str]:
+    fm = extract_frontmatter(p)
+    if fm is None:
+        return ["missing or unparseable frontmatter"]
+    return validate_frontmatter(fm)
 
 
 def main() -> int:
