@@ -123,6 +123,7 @@ sandboxes:
       push: ~/.hermes
       pull_on_teardown: true
       pull_paths: [.hermes, projects]
+      ignore: [.env]           # Excludes ~/.hermes/.env — see dev-box example above
 ```
 
 Sync uses Modal's `exec tar cf -` → `proc.stdout.read()` → local file pattern — same diff/apply logic as SSH.
@@ -167,6 +168,7 @@ sandboxes:
       push: ~/.hermes
       pull_on_teardown: false        # Work persists, no need to sync every time
       pull_on_command: "/sync-home"  # Manual sync when you want it
+      ignore: [.env]                 # Excludes ~/.hermes/.env — see dev-box example above
 ```
 
 Pair with a [Gemini API key or Vertex AI](./part9-custom-models.md#google-api-key-or-vertex-ai-gemini-oauth-is-gone) for cheap long-context reads inside the sandbox.

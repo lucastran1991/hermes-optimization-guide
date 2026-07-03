@@ -123,6 +123,7 @@ sandboxes:
       push: ~/.hermes
       pull_on_teardown: true
       pull_paths: [.hermes, projects]
+      ignore: [.env]           # Loại trừ ~/.hermes/.env — xem ví dụ dev-box ở trên
 ```
 
 Đồng bộ sử dụng mẫu `exec tar cf -` → `proc.stdout.read()` → file local của Modal — cùng logic diff/apply như SSH.
@@ -167,6 +168,7 @@ sandboxes:
       push: ~/.hermes
       pull_on_teardown: false        # Work persists, no need to sync every time
       pull_on_command: "/sync-home"  # Manual sync when you want it
+      ignore: [.env]                 # Loại trừ ~/.hermes/.env — xem ví dụ dev-box ở trên
 ```
 
 Kết hợp với [Gemini API key hoặc Vertex AI](./part9-custom-models.md#google-api-key-or-vertex-ai-gemini-oauth-is-gone) để đọc ngữ cảnh dài (long-context) với chi phí rẻ bên trong sandbox.
