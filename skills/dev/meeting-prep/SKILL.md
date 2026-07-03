@@ -85,6 +85,24 @@ cron:
     notify: telegram_dm
 ```
 
+## Memory discipline
+
+This skill holds the `memory` toolset, so apply Part 7's save rules
+deliberately — a wrong or transient memory is injected into every future
+session and compounds.
+
+**Save to memory** (durable, still true in 6 months):
+- Stable attendee facts: role/title, timezone, communication style, standing
+  preferences ("prefers async updates").
+- Recurring-relationship context that improves *every* future brief.
+
+**Do NOT save to memory** — recall with `session_search` instead:
+- This meeting's agenda, open asks, or action items (task state, changes weekly).
+- Anything one-off or date-specific ("follow up next Tuesday").
+
+Default is read-only (see `security.notes`). Writing memory is the narrow
+exception for durable relationship facts, never per-meeting task state.
+
 ## Tips
 
 - Route to Gemini Flash — you'll run this often and it's a long-context summarization task.

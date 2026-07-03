@@ -292,3 +292,11 @@ cron:
   - { name: weekly-cost-report, schedule: "0 9 * * 1",   task: "/cost-report window=7d format=markdown",  notify: telegram_dm }
   - { name: weekly-mcp-audit,   schedule: "0 10 * * 1",  task: "/audit-mcp",                              notify: telegram_dm }
   - { name: monthly-rotate,     schedule: "0 4 1 * *",   task: "/rotate-secrets webhook_hmac_*",          notify: telegram_dm }
+  # Part 5/7 hygiene reminders. `hermes curator enable` is a real native
+  # scheduler (part5-creating-skills.md:128) but has no documented YAML config
+  # surface to drive from this file; `/journey` (part7-memory-system.md:116-123)
+  # is interactive-only with no headless mode at all. Both entries below are
+  # scheduled REMINDERS pointing at the real CLI/TUI commands — not a claim
+  # that this file automates either one.
+  - { name: monthly-skill-curator-reminder, schedule: "0 8 1 * *", task: "Reminder: run `hermes curator run --dry-run` then `hermes curator run` to review skill-library duplicates/stale skills.", notify: telegram_dm }
+  - { name: monthly-journey-reminder,       schedule: "0 8 2 * *", task: "Reminder: open `/journey` and prune any wrong or stale memory entries.", notify: telegram_dm }
