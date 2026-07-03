@@ -166,6 +166,74 @@ mcp_servers:
       - ${HOME}/Projects
     trust: trusted
 
+# Tier-1 escalation: coding-agent-delegate's print-mode routing table.
+# See part18-coding-agents.md:108-123.
+delegation:
+  default: claude-code
+  routing:
+    - match: { type: refactor, files_changed_gte: 5 }
+      agent: claude-code            # large refactors across many files → Claude Code
+    - match: { type: bugfix, single_file: true }
+      agent: codex                  # single-file bug fix → Codex (fast sandboxed turnaround)
+    - match: { type: explore, repo_tokens_gte: 200000 }
+      agent: gemini-cli             # whole-repo explore/audit → Gemini CLI (1M context)
+    - match: { type: dependency_audit }
+      agent: gemini-cli             # dependency audits → Gemini CLI
+    - match: { budget: low }
+      agent: opencode               # budget-constrained edits → OpenCode + cheap model
+      model: moonshot/kimi-k2.6
+
+# ACP client bindings dispatched by delegation.routing above.
+# Source: part18-coding-agents.md:188-204.
+acp:
+  # Client-only: this template omits acp.enabled/server (inbound ACP-server mode)
+  # since coding-agent-delegate never accepts inbound ACP — see
+  # part18-coding-agents.md:188-194 for the full server-mode block if you need it.
+  clients:
+    claude-code:
+      command: claude
+      args: ["--acp"]
+    codex:
+      command: codex
+      args: ["--acp"]
+    gemini-cli:
+      command: gemini
+      args: ["--acp"]
+    # Not part of the guide's acp verbatim block (part18-coding-agents.md:188-204 ships
+    # only claude-code/codex/gemini-cli) — added so delegation.routing's `budget: low`
+    # rule (agent: opencode, above) has a matching acp client; same command/--acp shape.
+    opencode:
+      command: opencode
+      args: ["--acp"]
+  # /delegate_task picks an ACP client per delegation.routing
+
+# Tier-3 escalation: remote sandbox backends. See part21-remote-sandboxes.md:54-74.
+sandboxes:
+  dev-box:
+    backend: ssh                    # SSH-reachable dev box; other backends (Modal/Daytona) follow the same shape
+    host: dev.local
+    user: hermes
+    identity_file: ~/.ssh/hermes_ed25519   # key path, not key material — not a secret
+    workdir: /home/hermes/sandboxes
+    control_master: auto            # reuses one SSH connection for bulk sync
+    control_persist: 600
+    sync:
+      push: ~/.hermes               # uploaded to the sandbox at `/sandbox start`
+      pull_on_teardown: true        # syncs remote changes back on `/sandbox stop`
+      pull_paths:
+        - .hermes
+        - projects                  # grabs any code changes made in-sandbox
+      ignore:
+        - .git
+        - node_modules
+        - __pycache__
+        - "*.log"
+        - .env                      # CRITICAL: excludes ~/.hermes/.env. Without this,
+                                     # `push: ~/.hermes` above would sync live provider
+                                     # API keys to the remote sandbox host, violating
+                                     # part19-security-playbook.md:196 ("the agent cannot
+                                     # read ~/.hermes/.env — keys stay on the host").
+
 security:
   approval:
     bypass_subagents:
@@ -186,6 +254,13 @@ security:
       - { tool: email,    actions: [send] }
       - { tool: twilio,   actions: [send_sms] }
       - { tool: any_mcp,  sampling: true }
+      # Structured, write-capable delegation surfaces — same risk class as
+      # `terminal` above, gated the same way. NOTE: `denylist` below is a regex
+      # match over terminal exec strings only; it does NOT see these structured
+      # tool calls — known gap, not addressed here.
+      - { tool: delegate_task, actions: [dispatch] }
+      - { tool: kanban,   actions: [create, assign] }
+      - { tool: sandbox,  actions: [start, stop] }
     approval_channel: telegram_dm
   secrets:
     redaction_patterns:
