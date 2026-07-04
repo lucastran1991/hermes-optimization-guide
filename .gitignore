@@ -1,0 +1,11 @@
+# Secrets — never commit real env files or keys
+.env
+.env.*
+!*.env.example
+*.pem
+*.key
+
+# Language/tooling artifacts
+node_modules/
+__pycache__/
+*.pyc

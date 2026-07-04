@@ -113,6 +113,11 @@ fi
 # under another login user's home (e.g. an fnm-managed npm prefix) is
 # unreachable from the service and fails at delegation time with
 # `claude: command not found` (exit 127). Non-fatal: warns and continues.
+#
+# claude.ai/opencode.ai installers are fetched via curl|bash with no
+# published checksum to pin against (unlike NodeSource/Caddy above, which
+# have a GPG-signed apt path). Accepted risk: runs as unprivileged
+# `hermes`, same blast radius as the hermes-agent installer above.
 log "Installing coding-agent CLIs for the hermes user..."
 sudo -u hermes bash -c '
   mkdir -p "$HOME/.local/bin"
