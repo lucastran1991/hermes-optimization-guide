@@ -67,6 +67,15 @@ RestrictSUIDSGID=true
 # Address families — allow unix for local IPC, inet for HTTPS outbound
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 
+# Network — block the cloud metadata endpoint (AWS/GCP/Azure/OCI all use
+# this same link-local IP). Prevents a delegated coding-agent sub-session
+# (coding-agent-delegate skill, same UID/cgroup as this service) from
+# reading instance-principal/IAM credentials via IMDS. IPAddressDeny= is
+# most-specific-wins over IPAddressAllow=any, so this doesn't restrict any
+# other outbound traffic.
+IPAddressDeny=169.254.169.254/32
+IPAddressAllow=any
+
 # System calls
 SystemCallFilter=@system-service
 SystemCallFilter=~@privileged @resources @mount @cpu-emulation @debug @reboot @swap
