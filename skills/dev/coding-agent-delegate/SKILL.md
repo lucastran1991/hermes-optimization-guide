@@ -2,7 +2,7 @@
 name: coding-agent-delegate
 description: Delegate a coding task to a CLI agent, escalating to a Kanban lane or remote sandbox
 when_to_use:
-  - User invokes /delegate_code <task>
+  - User invokes /coding-agent-delegate <task>
   - A Kanban card is assigned to a coding-agent lane
   - A task needs isolated or remote execution (heavy compute / untrusted deps)
 toolsets:
@@ -45,7 +45,7 @@ The routing table below shells out to external CLIs: `claude` (claude-code), `co
 - `scripts/vps-bootstrap.sh` and `scripts/vps-bootstrap-oci.sh` (section 6b) install all four CLIs into `~hermes/.local/bin`, and their generated `~/.hermes/.env` prepends that dir to the service PATH via the unit's `EnvironmentFile=`.
 - Quick check that the service (not your shell) can see them: `sudo -u hermes env PATH=/home/hermes/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin claude --version` (repeat per CLI).
 - Caveat: the hardened `templates/systemd/hermes.service` sets `ProtectHome=read-only` with `ReadWritePaths=/home/hermes/.hermes` only — a delegated CLI that writes state under `$HOME` (e.g. `~/.claude`, `~/.codex`) may need its state dir redirected into `~/.hermes/` (same pattern as the unit's `XDG_STATE_HOME` workaround) or an extra `ReadWritePaths=` entry.
-- **`ccs` — required only when `harness: ccs` is used.** `scripts/vps-bootstrap.sh` / `-oci.sh` install `ccs@8.7.0` alongside the other four CLIs. Before flipping any delegation to `harness: ccs`, complete the one-time profile-provisioning step: run the interactive wizard `ccs api create` (preferred over the `--api-key` command-line form, which leaves the key in shell history/process args) to create the profile named in `templates/config/production.yaml`'s `delegation.ccs_profile` field (see that file's provisioning comment). `templates/systemd/hermes.service`'s `ReadWritePaths=/home/hermes/.ccs` (Phase 1) must already be in place for the profile's state to persist. Confirm the profile actually works with Phase 1's manual smoke-test gate — `ccs "<ccs_profile>" -p "echo ok" --output-format json` must exit 0 with valid JSON — **before** enabling `harness: ccs` anywhere; there is no automatic fallback to `bare` on failure. **ClaudeKit itself (the `~/.claude/` bundle) is a separate prerequisite this guide does not install** — `harness: ccs` without it produces identical (zero-harness) behavior to `harness: bare`.
+- **`ccs` — required only when `harness: ccs` is used.** `scripts/vps-bootstrap.sh` / `-oci.sh` install `ccs@8.7.0` alongside the other four CLIs. Before flipping any delegation to `harness: ccs`, complete the one-time profile-provisioning step: run the interactive wizard `ccs api create` (preferred over the `--api-key` command-line form, which leaves the key in shell history/process args) to create the profile named in `templates/config/production.yaml`'s `delegation.ccs_profile` field (see that file's provisioning comment). `templates/systemd/hermes.service`'s `ReadWritePaths=/home/hermes/.ccs` (Phase 1) must already be in place for the profile's state to persist. Confirm the profile actually works with Phase 1's manual smoke-test gate — `ccs "<ccs_profile>" -p "echo ok" --output-format json` must exit 0 with valid JSON — **before** enabling `harness: ccs` anywhere; there is no automatic fallback to `bare` on failure. **ClaudeKit (`~/.claude/`) is provisioned for the service user via `npm install -g claudekit-cli` + `ck init --global --kit engineer`** — once present, both `harness: bare` and `harness: ccs` load the full CK harness on this host (harness is gated by `~/.claude/` presence, not by `ccs` vs `bare`). The generic `scripts/vps-bootstrap.sh` does not install ClaudeKit (out of scope for that variant); `scripts/vps-bootstrap-oci.sh` now auto-installs it unconditionally (sections 6c/6d — `ck init` + skills venv), so a freshly-bootstrapped OCI host already has it.
 
 ## Procedure
 
@@ -170,15 +170,15 @@ sandboxes:
 ## Example invocation
 
 ```
-/delegate_code "fix flaky checkout tests" repo=myorg/app
-/delegate_code "refactor src/auth to JWT rotation" repo=myorg/app escalate=kanban
-/delegate_code "run full e2e suite" repo=myorg/app escalate=sandbox
+/coding-agent-delegate "fix flaky checkout tests" repo=myorg/app
+/coding-agent-delegate "refactor src/auth to JWT rotation" repo=myorg/app escalate=kanban
+/coding-agent-delegate "run full e2e suite" repo=myorg/app escalate=sandbox
 ```
 
-`parallel` example — fan out subtasks concurrently within one `delegate_code` call, opted into `harness: ccs`, one worktree per subtask:
+`parallel` example — fan out subtasks concurrently within one `coding-agent-delegate` call, opted into `harness: ccs`, one worktree per subtask:
 
 ```
-/delegate_code "add tests for src/payments/, split into 3 subtasks" repo=myorg/app harness=ccs parallel=3
+/coding-agent-delegate "add tests for src/payments/, split into 3 subtasks" repo=myorg/app harness=ccs parallel=3
   → 3x, each in its own worktree (git worktree add ../subtask-N devin/claude-code-<ts>-subtask-N):
      ccs ccs-hermes -p "<subtask N>" --allowedTools "Read,Edit,Bash" --max-turns 20 --output-format json
 ```
