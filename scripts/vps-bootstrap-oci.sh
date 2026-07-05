@@ -155,6 +155,43 @@ sudo -u hermes bash -c '
 ' || warn "Some coding-agent CLIs failed to install — delegation tiers that route to them will be unavailable."
 
 # ------------------------------------------------------------
+# 6c. ClaudeKit (as hermes user)
+# ------------------------------------------------------------
+# ClaudeKit (`ck`) grants the actual CK harness (skills, agents, rules) —
+# installing `ccs` above (section 6b) does not provide this on its own (see
+# production.yaml's ccs_profile comment). Unconditional, non-fatal: warns
+# and continues, matching section 6b.
+log "Installing ClaudeKit for the hermes user..."
+sudo -u hermes bash -c '
+  export PATH="$HOME/.local/bin:$PATH"
+  command -v ck >/dev/null 2>&1 || \
+    npm install -g --prefix "$HOME/.local" claudekit-cli
+' || warn "ClaudeKit (ck) install failed — global CK harness will be unavailable."
+
+sudo -u hermes -i bash -c 'ck init --global --kit engineer --yes --install-skills --skip-setup' \
+  || warn "ck init failed — global CK harness will be unavailable."
+
+# `ck init --install-skills` can exit 0 while leaving ~/.claude/skills EMPTY
+# if hermes has no `gh auth` configured yet — detect this and warn with the
+# exact recovery sequence instead of silently claiming success.
+if [ -z "$(sudo -u hermes bash -c 'ls -A "$HOME/.claude/skills" 2>/dev/null')" ]; then
+  warn "skills empty — run: bash scripts/provision-hermes-delegation/0-gh-auth.sh --token=<PAT>  then re-run:  sudo -u hermes -i ck init --global --kit engineer --yes --install-skills --skip-setup"
+fi
+
+# ------------------------------------------------------------
+# 6d. Skills venv (as hermes user)
+# ------------------------------------------------------------
+# Skills' Python deps (google-genai, pypdf, etc.) live in a per-user venv
+# under ~/.claude/skills/.venv. Must run via `-i` (login shell) — a bare
+# `sudo -u hermes bash -c` does not chdir to hermes's home, so install.sh
+# writes into the CALLER's cwd instead and fails with EACCES.
+if [ ! -d /home/hermes/.claude/skills/.venv ]; then
+  log "Installing skills venv for the hermes user..."
+  sudo -u hermes -i bash -c '[ -x "$HOME/.claude/skills/install.sh" ] && "$HOME/.claude/skills/install.sh" -y' \
+    || warn "Skills venv install failed — Python-based skills will be unavailable."
+fi
+
+# ------------------------------------------------------------
 # 7. Skill symlinks + config scaffolding
 # ------------------------------------------------------------
 log "Linking skills from the guide into ~hermes/.hermes/skills/..."
