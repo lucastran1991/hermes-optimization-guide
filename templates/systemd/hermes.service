@@ -25,6 +25,15 @@ StartLimitBurst=5
 EnvironmentFile=-/home/hermes/.hermes/.env
 Environment=HOME=/home/hermes
 Environment=HERMES_CONFIG=/home/hermes/.hermes/config.yaml
+# systemd does not read shell profiles, so bare-name CLI invocations from
+# delegated sub-sessions (ccs, claude, ck, opencode in ~/.local/bin) resolve
+# against this PATH only. Without ~/.local/bin here every delegated call fails
+# `command not found` (exit 127). The .env scaffold also sets PATH, but only
+# for freshly-scaffolded .env files — an already-provisioned host whose .env
+# predates that scaffold gets no PATH from EnvironmentFile, so this unit-level
+# value is the authoritative, EnvironmentFile-independent guarantee. Declared
+# after EnvironmentFile= above so it always wins regardless of .env contents.
+Environment=PATH=/home/hermes/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
 # ProtectHome=read-only below blocks the default ~/.local/state/hermes
 # gateway lock dir; redirect it into the one path we do allow writes to
 # instead of widening ReadWritePaths.
@@ -42,7 +51,7 @@ ProtectHome=read-only
 # /home/hermes/.ccs holds per-profile CCS state (credentials, session
 # history, job queue) needed by the coding-agent-delegate skill's
 # CCS-routed Tier 1.
-ReadWritePaths=/home/hermes/.hermes /home/hermes/.ccs /tmp
+ReadWritePaths=/home/hermes/.hermes /home/hermes/.ccs /home/hermes/.claude /tmp
 PrivateTmp=true
 PrivateDevices=true
 
