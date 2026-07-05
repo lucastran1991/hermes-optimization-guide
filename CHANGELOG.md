@@ -2,6 +2,42 @@
 
 Dated list of meaningful guide updates. Roughly [Keep a Changelog](https://keepachangelog.com) flavored.
 
+## 2026-07-04 — Unit-Drift Prevention Script + ClaudeKit Prerequisite Reframe
+
+### Added
+- `scripts/deploy-systemd-units.sh` — diffs `templates/systemd/*.service` against
+  the live `/etc/systemd/system/` units and installs + restarts only what
+  changed (idempotent, non-disruptive), so an edited unit template can't
+  silently sit undeployed.
+- `scripts/provision-hermes-delegation/` — fork-local, numbered scripts that
+  provision a host for `coding-agent-delegate` delegation: `0-gh-auth.sh`
+  (non-interactive `gh` token-based auth for the `hermes` user via
+  `--with-token`), `1-claude-auth.sh` (Claude Code credential provisioning
+  for the `hermes` user), `2-ccs-profile.sh` (creates + smoke-tests a
+  dedicated `ccs-hermes` CCS API profile matching `production.yaml`'s
+  `delegation.ccs_profile`), and `4-merge-delegation-config.sh` (merges the
+  `delegation:` block from `templates/config/production.yaml` into the live
+  `/home/hermes/.hermes/config.yaml`, replacing rather than duplicating an
+  existing block, with a `.bak` backup and a PyYAML validation gate; does
+  not restart `hermes.service` — a manual restart is required to reload
+  both the config and the in-process skill-command registry).
+- `scripts/vps-bootstrap-oci.sh` gains two additional provisioning steps
+  (6c/6d: ClaudeKit + skills venv) that hook the new
+  `provision-hermes-delegation/` scripts into the bootstrap flow. The
+  generic `scripts/vps-bootstrap.sh` is unchanged (out of scope).
+
+### Changed
+- `templates/systemd/hermes.service` — fixed `ReadWritePaths`/`PATH` so the
+  unit can actually reach the credential/config state the delegation
+  provisioning scripts write under the `hermes` user's home directory.
+- `skills/dev/coding-agent-delegate/SKILL.md` Prerequisites: replaced the
+  stale "ClaudeKit is a separate prerequisite this guide does not install"
+  line with the actual provisioning mechanism (`npm install -g
+  claudekit-cli` + `ck init --global --kit engineer`) now that a host has
+  been provisioned this way — harness is gated by `~/.claude/` presence, not
+  by `harness: ccs` vs `bare`. Also notes ClaudeKit is provisioned manually
+  per-host, unlike the four sibling CLIs in `vps-bootstrap*.sh`.
+
 ## 2026-07-03 — CCS-Routed Coding-Agent Delegation (Opt-In)
 
 ### Added
