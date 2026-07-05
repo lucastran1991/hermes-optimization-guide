@@ -1,1 +1,4 @@
 - [Skill-doc vs template drift](project_skill-doc-vs-template-drift.md) — SKILL.md quotes guide chapters verbatim; can drift from hardened templates/config/*.yaml. Check both.
+- [/opt vs /home/ubuntu/workspace clone drift](project_opt-vs-workspace-clone-drift-on-oci-host.md) — bootstrap-canonical `/opt` clone on lucas-oracle-instance can be stale/days-behind; verify before trusting either as source of truth.
+- [sudo secure_path strips hermes .local/bin](project_hermes-host-sudo-secure-path-strips-local-bin.md) — bare `sudo -u hermes <cli>` always fails; must wrap in `bash -c` with explicit PATH export.
+- [hermes OAuth credential readable by delegated sub-sessions](project_hermes-oauth-credential-exposed-to-delegated-subsessions.md) — ProtectHome=read-only + no `.claude` RWpath = same-UID sub-sessions can read it; open as of 260703-1738 plan.
