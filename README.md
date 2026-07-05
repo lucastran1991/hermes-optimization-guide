@@ -22,6 +22,8 @@ Every part you need to go from fresh install to a production Hermes deployment �
 
 Unlike most guides, the prescriptions come with **working files**: [`skills/`](./skills) you can `ln -s` into `~/.hermes/skills/`, [`templates/config/`](./templates/config) you `cp` to `~/.hermes/config.yaml`, [`scripts/vps-bootstrap.sh`](./scripts/vps-bootstrap.sh) that takes a fresh VPS to production in one command.
 
+> **Editing a `templates/systemd/*.service` file?** The on-host source-of-truth is the canonical clone (the bootstrap `GUIDE_DIR`, e.g. `/opt/hermes-optimization-guide`) — reconcile it (`git -C /opt/hermes-optimization-guide pull --ff-only`), then run [`scripts/deploy-systemd-units.sh`](./scripts/deploy-systemd-units.sh) (needs `sudo`) to sync the change to `/etc/systemd/system/`. A unit fix left undeployed is a silent no-op — this is the one-command way to actually ship it.
+
 *By Terp — [Terp AI Labs](https://x.com/OnlyTerp)* · Last updated **July 1, 2026** · [CHANGELOG](./CHANGELOG.md) · [ROADMAP](./ROADMAP.md) · [ECOSYSTEM](./ECOSYSTEM.md)
 
 ---
@@ -67,6 +69,8 @@ Prefer a 5-minute local-only setup? → **[docs/quickstart.md](./docs/quickstart
 | [`templates/systemd/`](./templates/systemd) | Hardened `hermes.service` + `hermes-dashboard.service`. |
 | [`templates/cron/`](./templates/cron) | Recommended production cron schedule. |
 | [`scripts/vps-bootstrap.sh`](./scripts/vps-bootstrap.sh) | One-command fresh VPS → production Hermes. |
+| [`scripts/deploy-systemd-units.sh`](./scripts/deploy-systemd-units.sh) | Sync edited `templates/systemd/*.service` to `/etc/systemd/system/` — diff-based, restarts only changed units that are already active (never auto-starts a new one). |
+| [`scripts/provision-hermes-delegation/`](./scripts/provision-hermes-delegation) | Fork-local, numbered scripts that provision a host for `coding-agent-delegate`: `gh` auth, Claude/CCS credential provisioning, and merging the `delegation:` block into the live `hermes` config. Not part of the public bootstrap path — see each script's own header before running. |
 | [`diagrams/`](./diagrams) | 6 Mermaid diagrams (architecture, MCP flow, delegation, sandbox sync, observability, security layers). |
 | [`assets/`](./assets) | Banner graphics used across the guide. |
 | [`benchmarks/`](./benchmarks) | Reproducible cost + latency table across 12 models × 5 tasks. |
