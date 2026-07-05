@@ -1,0 +1,1 @@
+- [Hermes-agent config drift plan review](hermes_agent_config_drift_fact_checking.md) — reusable fact-check techniques for verifying claimed "real config schema" against hermes-agent source.
