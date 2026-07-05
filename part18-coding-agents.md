@@ -106,7 +106,7 @@ Hermes runs them in three independent subagent slots, streams progress, and aggr
 A second pattern: the same agent (claude-code), routed through one CCS profile, each subtask in its own git worktree to avoid file-lock conflicts:
 
 ```
-/delegate_code "add tests for src/payments/, split into 3 subtasks" \
+/coding-agent-delegate "add tests for src/payments/, split into 3 subtasks" \
   repo=myorg/app \
   harness=ccs \
   parallel=3
