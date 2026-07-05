@@ -2,6 +2,19 @@
 
 Dated list of meaningful guide updates. Roughly [Keep a Changelog](https://keepachangelog.com) flavored.
 
+## 2026-07-05 — Delegation Timeout Fix: Background Mode Replaces Blocking Foreground Calls
+
+### Fixed
+- `skills/dev/coding-agent-delegate/SKILL.md` Tier 1: delegated `/ck:*` calls
+  routed through `ccs`/`claude -p` were timing out with no output on long
+  tasks (confirmed live: `exit_code 124` at 17:20:32 after a 90s timeout, and
+  again at 17:47:58 after a 120s timeout, both during the same
+  `/ck:brainstorm` delegation). Tier 1 now shells out via
+  `terminal(background=true)` plus a bounded `process(action=poll/log/wait)`
+  retry loop instead of a blocking foreground `terminal` call, so long-running
+  delegated tasks survive past any single timeout window and progress/output
+  stays retrievable instead of being lost on kill.
+
 ## 2026-07-04 — Unit-Drift Prevention Script + ClaudeKit Prerequisite Reframe
 
 ### Added

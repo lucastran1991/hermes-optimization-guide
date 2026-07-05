@@ -101,7 +101,7 @@ In parallel:
 3. /gemini-cli audit dependencies in package.json for security
 ```
 
-Hermes runs them in three independent subagent slots, streams progress, and aggregates.
+Hermes runs them in three independent subagent slots, streams progress, and aggregates. (This is the native `/delegate_task` subagent-slot mechanism — distinct from `coding-agent-delegate`'s Tier-1 CLI shell-out below, which surfaces progress via `process(action=poll/log/wait)` and existing session logs, not a live stream.)
 
 A second pattern: the same agent (claude-code), routed through one CCS profile, each subtask in its own git worktree to avoid file-lock conflicts:
 
@@ -226,7 +226,7 @@ acp:
       args: ["--acp"]
 ```
 
-The `/delegate_task` tool then picks an ACP client based on `delegation.routing` rules and streams progress back over a single WebSocket.
+The `/delegate_task` tool then picks an ACP client based on `delegation.routing` rules and streams progress back over a single WebSocket. (This WebSocket streaming is specific to the native `/delegate_task` tool — `coding-agent-delegate`'s Tier-1 CLI shell-out is a separate mechanism that surfaces progress through `process(action=poll/log/wait)` and existing session logs, not a WebSocket.)
 
 ---
 

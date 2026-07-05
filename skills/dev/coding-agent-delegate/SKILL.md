@@ -10,6 +10,7 @@ toolsets:
   - kanban
   - sandbox
   - file
+  - terminal
 parameters:
   task:
     type: string
@@ -68,23 +69,81 @@ The routing table below shells out to external CLIs: `claude` (claude-code), `co
          agent: opencode
          model: moonshot/kimi-k2.6
    ```
-   Invoke print-mode CLI. For edit-only tasks that don't need shell access, scope the allowlist down — no Bash:
-   ```bash
-   claude -p "..." --allowedTools "Read,Edit" --max-turns 20 --output-format json
-   ```
-   Reserve the full `Read,Edit,Bash` allowlist for tasks that explicitly need to run commands (tests, builds):
-   ```bash
-   claude -p "..." --allowedTools "Read,Edit,Bash" --max-turns 20 --output-format json
-   ```
-   `/delegate_task` selects the ACP client per routing rules and streams progress back over a single WebSocket.
 
-   These two examples use the **default `harness: bare`** — no change to today's behavior.
+   **Decision rule — foreground vs background** (orthogonal to the Bash / no-Bash allowlist choice below): single-file bugfix with `--max-turns` ≤ 10 → foreground is OK, the exception, not the default. Anything that invokes a `/ck:*` meta-skill, uses `parallel=`, or has no tight turn bound → **background, no exceptions.** In practice this means: default to background for any delegation expected to run more than ~1-2 minutes.
 
-   Before switching to `harness: ccs`, note: (a) print mode (`-p`) is already non-interactive — no separate "auto"/unattended flag is needed on the inner call; (b) harness (whether `~/.claude/CLAUDE.md` + rules + skills catalog + hooks load) depends on `~/.claude/` existing on **the host**, not on choosing `ccs` over `bare` — both wrap the same `claude` binary and get identical harness on a given machine. Don't walk away assuming `harness: ccs` alone solves it; see Prerequisites. With that understood, the opt-in `harness: ccs` variant routes the same call through a scoped delegation identity/profile (separate API key, quota, and audit trail from a human's own CCS session), only after Phase 1's smoke-test gate has passed:
+   **Escape the task text before building any command below.** Wrap `<task>` in single quotes and escape embedded single quotes with the standard `'"'"'` close-quote/escaped-quote/reopen-quote trick; never interpolate raw external text (e.g. Telegram-origin) directly into a double-quoted shell argument — that reopened a shell-injection gap in the examples below if skipped.
+
+   **Background (default) — any `/ck:*` call, `parallel=` fan-out, or open-ended-turn task.** Invoke via `terminal(background=true, notify_on_complete=true)`. **No shell redirect to a file** — let stdout/stderr flow through `process_registry`'s own pipe (already redacted, already pollable via `process(action=...)` below); the durable `~/.ccs/logs/current.jsonl` and `~/.claude/projects/**/*.jsonl` logs remain the external-tail channel, so a redirect would only bypass redaction and starve the pipe `process(action=poll/log)` reads from. No-Bash (edit-only tasks):
+   ```
+   terminal(
+     command='claude -p "<shell-escaped task>" \
+       --allowedTools "Read,Edit" \
+       --max-turns 20 \
+       --output-format stream-json --verbose --include-partial-messages',
+     background=true,
+     notify_on_complete=true
+   )
+   ```
+   With Bash (tasks that need to run commands — tests, builds):
+   ```
+   terminal(
+     command='claude -p "<shell-escaped task>" \
+       --allowedTools "Read,Edit,Bash" \
+       --max-turns 20 \
+       --output-format stream-json --verbose --include-partial-messages',
+     background=true,
+     notify_on_complete=true
+   )
+   ```
+
+   **Foreground (exception) — single-file bugfix, `--max-turns` ≤ 10 only.** No-Bash:
    ```bash
-   ccs "<ccs_profile>" -p "..." --allowedTools "Read,Edit,Bash" --max-turns 20 --output-format json
+   claude -p "<shell-escaped task>" --allowedTools "Read,Edit" --max-turns 10 --output-format json
+   ```
+   With Bash:
+   ```bash
+   claude -p "<shell-escaped task>" --allowedTools "Read,Edit,Bash" --max-turns 10 --output-format json
+   ```
+   Foreground `terminal()` blocks up to `TERMINAL_TIMEOUT` (default 180s). Never request `timeout=` above 600s (`FOREGROUND_MAX_TIMEOUT`, the hard cap) in foreground mode — Hermes core rejects it outright and tells the caller to use `background=true` instead, which is exactly why background is the default above, not a raised timeout.
+
+   `/delegate_task` (the native ACP path — a different mechanism from the `terminal()` CLI shell-out documented in this section) selects the ACP client per routing rules and streams progress back over a single WebSocket; the Tier-1 `terminal()` calls above do not stream and must be polled per "Checking progress on a backgrounded delegation" below.
+
+   These examples use the **default `harness: bare`** — no change to today's behavior.
+
+   Before switching to `harness: ccs`, note: (a) print mode (`-p`) is already non-interactive — no separate "auto"/unattended flag is needed on the inner call; (b) harness (whether `~/.claude/CLAUDE.md` + rules + skills catalog + hooks load) depends on `~/.claude/` existing on **the host**, not on choosing `ccs` over `bare` — both wrap the same `claude` binary and get identical harness on a given machine. Don't walk away assuming `harness: ccs` alone solves it; see Prerequisites. With that understood, the opt-in `harness: ccs` variant routes the same call through a scoped delegation identity/profile (separate API key, quota, and audit trail from a human's own CCS session), only after Phase 1's smoke-test gate has passed. Same fg/bg + allowlist matrix applies — just swap `claude` for `ccs "<ccs_profile>"`; background shape:
+   ```
+   terminal(
+     command='ccs "<ccs_profile>" -p "<shell-escaped task>" \
+       --allowedTools "Read,Edit,Bash" \
+       --max-turns 20 \
+       --output-format stream-json --verbose --include-partial-messages',
+     background=true,
+     notify_on_complete=true
+   )
    ```
    `<ccs_profile>` stands for whatever `delegation.ccs_profile` (`templates/config/production.yaml`) currently holds — this is illustrative, not literal executable syntax; the Hermes gateway substitutes the real value at dispatch time.
+
+   **Checking progress on a backgrounded delegation.** `process(action="wait", session_id=...)` is a call-in-a-loop primitive, not a one-shot block — it clamps to `TERMINAL_TIMEOUT` (180s) regardless of the `timeout=` you request, and on expiry returns `status: "timeout"` (the process is still running, this is not an error) rather than the final result. Loop on it:
+   ```
+   iterations = 0
+   while iterations < 10:                        # cap: 10 iterations, ~30 min wall-clock
+       result = process(action="wait", session_id=<id>)
+       if result.status == "exited":
+           break                                  # done — read result.output
+       iterations += 1                             # result.status == "timeout" → still running, loop again
+   else:
+       # Cap exceeded. This is the EXPECTED COMMON outcome for a large /ck:* fan-out
+       # or parallel= call, not a rare edge case — do NOT kill the session or error.
+       report_degraded_status(session_id=<id>, message="still running after ~30min")
+   ```
+   - `process(action="poll", session_id=...)` — cheap status + new-output-since-last-poll, call anytime, does not block.
+   - `process(action="log", session_id=...)` — pull full/windowed output without ending the session.
+   - On cap-exceeded, report back something like "still running after ~30min, session_id=<id>, check back with `process(action='poll'|'wait', session_id=<id>)`" and stop actively looping — the background process itself keeps running and is resumable; the cap only bounds how long *this agent turn* blocks on it, not the delegation's actual runtime.
+
+   **`session_id` is a bearer capability, not access-controlled.** `process(action=poll|log|wait|kill|write|submit|close)` takes a bare `session_id` with no ownership check in Hermes core — any concurrent session that learns one can poll/kill/read that delegation's output. Never echo a `session_id` into a Kanban comment, group chat, shared log, or any other surface a different session could read — this includes the degraded "still running" message above; keep `session_id` inside the originating private conversation only.
+
+   **Background mode does not survive a Hermes gateway restart.** The delegated child shares the gateway's own systemd cgroup, so a gateway `stop`/`restart` kills it too. Background mode removes today's artificial short-timeout kill — it is not restart-proof.
 
 3. **Detect escalation signals** — long-running / needs human review / multi-handoff → tier 2; needs isolation / heavy compute / untrusted deps → tier 3.
 
@@ -175,12 +234,21 @@ sandboxes:
 /coding-agent-delegate "run full e2e suite" repo=myorg/app escalate=sandbox
 ```
 
-`parallel` example — fan out subtasks concurrently within one `coding-agent-delegate` call, opted into `harness: ccs`, one worktree per subtask:
+`parallel` example — fan out subtasks concurrently within one `coding-agent-delegate` call, opted into `harness: ccs`, one worktree per subtask. Each subtask is exactly the kind of task the decision rule sends to background (`parallel=`, no tight turn bound), so all 3 run backgrounded — never foreground for a `parallel=` fan-out:
 
 ```
 /coding-agent-delegate "add tests for src/payments/, split into 3 subtasks" repo=myorg/app harness=ccs parallel=3
   → 3x, each in its own worktree (git worktree add ../subtask-N devin/claude-code-<ts>-subtask-N):
-     ccs ccs-hermes -p "<subtask N>" --allowedTools "Read,Edit,Bash" --max-turns 20 --output-format json
+     terminal(
+       command='ccs "ccs-hermes" -p "<subtask N, shell-escaped>" \
+         --allowedTools "Read,Edit,Bash" \
+         --max-turns 20 \
+         --output-format stream-json --verbose --include-partial-messages',
+       background=true,
+       notify_on_complete=true
+     )
+  → poll/wait-loop each of the 3 session_ids (see "Checking progress on a backgrounded
+    delegation" above) until each exits or the 10-iteration cap is hit
 ```
 
 One CCS profile can serve concurrent calls, but the actual throughput ceiling is unverified (`@kaitranntt/ccs`'s `proper-lockfile` dependency suggests possible serialization) — test on your deployment before assuming `N` is unbounded.
