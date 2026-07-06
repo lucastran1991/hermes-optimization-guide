@@ -166,6 +166,8 @@ fatal design flaw found.
    yet — deferred pending a dedicated live-Telegram test. Full evidence:
    `phase-03-live-host-verification.md` Status Notes + Unresolved Question 2.
 3. Whether `metadata.hermes.requires_toolsets` (the schema this repo's `SKILL.md` does NOT use, but two other skills in this repo do) is itself enforced anywhere in the real tool-execution path, or is discovery-listing-only like the top-level `toolsets:` key — not traced by red-team. Not a blocker for this plan (this plan doesn't rely on either key for security), but worth a future note if per-skill tool restriction is ever wanted as a real control.
+4. **New (2026-07-05, from phase-03 Addendum) — whether `parallel=N` on this host actually routes through Phase 1's rewritten Tier-1 `terminal()`/`process()` pattern at all**, or always dispatches via the native `delegate_task`/ACP mechanism instead (observed in phase-03 Test 3 — both subtasks errored for an unrelated reason, not investigated). Not confirmed as a defect — flagged for a future check.
+5. **New (2026-07-05, from phase-03 Addendum) — whether saving a delegation's report artifact into the target repo's own `plans/` directory is expected to work when that repo/mount is read-only for the hermes user** (observed once: `/home/hermes/workspace/nfi/plans/` rejected the write with "Read-only file system"). Unclear if deliberate or misconfiguration. Out of Phase 1/3's original scope, but a real friction point — no fix proposed here.
 
 ## Validation Log
 
