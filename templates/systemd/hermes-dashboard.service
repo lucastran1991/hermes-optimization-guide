@@ -7,15 +7,15 @@ BindsTo=hermes.service
 
 [Service]
 Type=simple
-User=hermes
-Group=hermes
-WorkingDirectory=/home/hermes
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu
 ExecStart=/usr/local/bin/hermes dashboard --host 127.0.0.1 --port 8765 --no-open --skip-build
 Restart=on-failure
 RestartSec=5
 
-EnvironmentFile=-/home/hermes/.hermes/.env
-Environment=HOME=/home/hermes
+EnvironmentFile=-/home/ubuntu/.hermes/.env
+Environment=HOME=/home/ubuntu
 
 StandardOutput=journal
 StandardError=journal
@@ -24,7 +24,7 @@ SyslogIdentifier=hermes-dashboard
 # Hardening (same as hermes.service; expose only loopback)
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/home/hermes/.hermes /tmp
+ReadWritePaths=/home/ubuntu/.hermes /home/ubuntu/workspace /tmp
 PrivateTmp=true
 PrivateDevices=true
 NoNewPrivileges=true
@@ -43,6 +43,9 @@ RestrictSUIDSGID=true
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 SystemCallFilter=@system-service
 SystemCallFilter=~@privileged @resources @mount @cpu-emulation @debug @reboot @swap
+# See hermes.service for the 2026-07-06 migration finding this addresses
+# (same binary/venv, applied here for consistency/safety).
+SystemCallErrorNumber=EPERM
 SystemCallArchitectures=native
 
 MemoryMax=1G

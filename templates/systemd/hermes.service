@@ -7,9 +7,9 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=hermes
-Group=hermes
-WorkingDirectory=/home/hermes
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu
 ExecStart=/usr/local/bin/hermes gateway run
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
@@ -22,9 +22,9 @@ StartLimitInterval=300
 StartLimitBurst=5
 
 # Environment
-EnvironmentFile=-/home/hermes/.hermes/.env
-Environment=HOME=/home/hermes
-Environment=HERMES_CONFIG=/home/hermes/.hermes/config.yaml
+EnvironmentFile=-/home/ubuntu/.hermes/.env
+Environment=HOME=/home/ubuntu
+Environment=HERMES_CONFIG=/home/ubuntu/.hermes/config.yaml
 # systemd does not read shell profiles, so bare-name CLI invocations from
 # delegated sub-sessions (ccs, claude, ck, opencode in ~/.local/bin) resolve
 # against this PATH only. Without ~/.local/bin here every delegated call fails
@@ -33,11 +33,11 @@ Environment=HERMES_CONFIG=/home/hermes/.hermes/config.yaml
 # predates that scaffold gets no PATH from EnvironmentFile, so this unit-level
 # value is the authoritative, EnvironmentFile-independent guarantee. Declared
 # after EnvironmentFile= above so it always wins regardless of .env contents.
-Environment=PATH=/home/hermes/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
+Environment=PATH=/home/ubuntu/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
 # ProtectHome=read-only below blocks the default ~/.local/state/hermes
 # gateway lock dir; redirect it into the one path we do allow writes to
 # instead of widening ReadWritePaths.
-Environment=XDG_STATE_HOME=/home/hermes/.hermes/xdg_state
+Environment=XDG_STATE_HOME=/home/ubuntu/.hermes/xdg_state
 
 # Logging
 StandardOutput=journal
@@ -48,10 +48,10 @@ SyslogIdentifier=hermes
 # Filesystem
 ProtectSystem=strict
 ProtectHome=read-only
-# /home/hermes/.ccs holds per-profile CCS state (credentials, session
+# /home/ubuntu/.ccs holds per-profile CCS state (credentials, session
 # history, job queue) needed by the coding-agent-delegate skill's
 # CCS-routed Tier 1.
-ReadWritePaths=/home/hermes/.hermes /home/hermes/.ccs /home/hermes/.claude /tmp
+ReadWritePaths=/home/ubuntu/.hermes /home/ubuntu/.ccs /home/ubuntu/.claude /home/ubuntu/workspace /tmp
 PrivateTmp=true
 PrivateDevices=true
 
@@ -98,6 +98,17 @@ SystemCallFilter=~@privileged @resources @mount @cpu-emulation @debug @reboot @s
 # re-allowing just this one syscall doesn't reopen what @resources exists
 # to block.
 SystemCallFilter=sched_setscheduler
+# Migration finding (2026-07-06, hermes->ubuntu user merge): under User=ubuntu
+# (unlike User=hermes), some optional startup syscall in this same
+# @resources-denied surface triggers on every launch — not pinned to an
+# exact syscall name (no coredumpctl/strace/dmesg access available during
+# the incident). Default kill action is too blunt for an opportunistic call
+# the app already tolerates failing (confirmed: runs stable, Telegram
+# connects normally, once the denial is a catchable error instead of a
+# signal). CapabilityBoundingSet= stays empty and NoNewPrivileges=true
+# stays set regardless of this line — EPERM only changes the denial's
+# failure mode for this process, it grants no additional capability.
+SystemCallErrorNumber=EPERM
 SystemCallArchitectures=native
 
 # Memory / file descriptor limits
