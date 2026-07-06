@@ -1,7 +1,7 @@
 ---
 title: "Fix Urgent Hermes Delegation Issues: Stale Unit, Auth, CCS/ClaudeKit Provisioning"
 description: "Deploy the undeployed P0 seccomp fix crashing Hermes bot delegation, add unit-drift-prevention tooling, and provision claude auth + CCS/ClaudeKit so harness: ccs delegation works end-to-end."
-status: pending
+status: in-progress
 priority: P1
 effort: "4h25m"
 branch: "main"
@@ -35,10 +35,10 @@ Six phases: deploy the P0 fix (2), add tooling so unit-drift can't silently recu
 |-------|------|--------|
 | 1 | [Deploy-Drift Prevention Tooling](./phase-01-deploy-drift-prevention-tooling.md) | **Completed** — script live-validated (0 changed on synced host, idempotent, non-disruptive) |
 | 2 | [Deploy P0 Systemd Fix](./phase-02-deploy-p0-systemd-fix.md) | **Completed** — verified: unit live, no SIGSYS since restart, claude/opencode --version both exit 0 |
-| 3 | [Claude Auth For Hermes](./phase-03-claude-auth-for-hermes.md) | Pending — `[HUMAN]` login needed |
+| 3 | [Claude Auth For Hermes](./phase-03-claude-auth-for-hermes.md) | **Completed (2026-07-06)** — verified via real delegated `claude -p` success (Success Criteria's alternate clause), not a direct `claude auth status` check; see phase file |
 | 4 | [Install CCS And ClaudeKit](./phase-04-install-ccs-and-claudekit.md) | In progress — installed, `ck doctor` has 3 accepted gh-auth FAILs |
-| 5 | [Provision CCS Profile](./phase-05-provision-ccs-profile.md) | Pending — `[HUMAN]` wizard needed |
-| 6 | [Integration Verification And Docs](./phase-06-integration-verification-and-docs.md) | Blocked on 1, 2, 3, 5 |
+| 5 | [Provision CCS Profile](./phase-05-provision-ccs-profile.md) | **Completed (2026-07-06)** — `production.yaml:193` confirmed `ccs-hermes`; smoke-test superseded by a real successful task run; see phase file |
+| 6 | [Integration Verification And Docs](./phase-06-integration-verification-and-docs.md) | Pending — unblocked (1,2,3,5 all done) but its own Success Criteria (skill symlink, live `delegation:` block, `SKILL.md` reframe, memory/changelog sync) has no evidence any of it happened yet |
 
 ## Dependency Graph
 
@@ -187,3 +187,13 @@ Host: the canonical on-host clone is **`/opt/hermes-optimization-guide`** (boots
 - Checked for stale "open question: whose seat" phrasing elsewhere (none found outside Phase 3).
 - No other phase references seat ownership, so no further propagation needed.
 - **Unresolved contradictions: 0.**
+
+## Status Update (2026-07-06)
+
+This plan's phase files were committed once (`8bc32b4`, 2026-07-03) and never updated despite two later, independent pieces of live evidence. Reconciled now:
+
+- **Phase 3 (Claude Auth) → completed.** `plans/reports/scout-260705-1421-hermes-oci-live-host-best-practice-drift-audit-report.md` (2026-07-05) reported claude auth functional live; today (2026-07-06) a real delegated `ccs ccs-hermes -p '/ck:brainstorm...'` run (model `claude-opus-4-8`, exit 0) directly satisfies this phase's own Success Criteria alternate clause. See `plans/260705-1752-ccs-delegation-timeout-progress-tracking-fix/phase-03-live-host-verification.md` Addendum for the raw evidence.
+- **Phase 5 (Provision CCS Profile) → completed.** Same live-test run invoked the `ccs-hermes` profile successfully end-to-end (stronger than the documented `echo ok` smoke test); `production.yaml:193` independently confirmed still `ccs-hermes`.
+- **Phase 4 unchanged (in-progress)** — `ck doctor`'s 3 gh-auth FAILs are accepted-degraded, not "healthy" per the literal Success Criteria; no new evidence closes this gap.
+- **Phase 6 unchanged (pending)** — dependency-wise unblocked now that 3 and 5 are done, but its Success Criteria (skill symlink into live catalog, `delegation:` block in live `config.yaml`, `SKILL.md` reframe, memory/changelog sync) has no evidence any of that work happened. This is the one phase still genuinely open in this plan.
+- Top-level `status` frontmatter: `pending` → `in-progress` (4/6 phases done, 1 in-progress, 1 pending).

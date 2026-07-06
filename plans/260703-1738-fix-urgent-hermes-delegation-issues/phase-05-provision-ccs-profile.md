@@ -1,13 +1,15 @@
 ---
 phase: 5
 title: "Provision CCS Profile"
-status: pending
+status: completed
 effort: "35m"
 ---
 
 # Phase 5: Provision CCS Profile
 
-**Priority:** P2 · **Status:** pending · **Effort:** ~35m · **Blocked by:** Phase 4 (needs the `ccs` binary + writable `~/.ccs`) · **Ownership:** host-only, plus a *conditional* one-line `production.yaml` edit
+**Priority:** P2 · **Status:** completed · **Effort:** ~35m · **Blocked by:** Phase 4 (needs the `ccs` binary + writable `~/.ccs`) · **Ownership:** host-only, plus a *conditional* one-line `production.yaml` edit
+
+**Completed (2026-07-06):** `templates/config/production.yaml:193` confirmed `ccs_profile: ccs-hermes` (no edit needed, matches recommendation). Smoke-test superseded by a stronger real-task run: `ccs ccs-hermes -p '/ck:brainstorm...' --output-format stream-json ...` exited 0 with a real completed result (model `claude-opus-4-8`, ~111s) — see `plans/260705-1752-ccs-delegation-timeout-progress-tracking-fix/phase-03-live-host-verification.md` Addendum. A full successful task run is stronger proof than the documented `echo ok` smoke test.
 
 ## Context Links
 

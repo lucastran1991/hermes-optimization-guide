@@ -1,13 +1,15 @@
 ---
 phase: 3
 title: "Claude Auth For Hermes"
-status: pending
+status: completed
 effort: "20m"
 ---
 
 # Phase 3: Claude Auth For Hermes
 
-**Priority:** P1 · **Status:** pending · **Effort:** ~20m · **Blocked by:** none (parallel group A) · **Ownership:** host-only, no repo writes
+**Priority:** P1 · **Status:** completed · **Effort:** ~20m · **Blocked by:** none (parallel group A) · **Ownership:** host-only, no repo writes
+
+**Completed (2026-07-06), verified via Success Criteria's alternate clause** ("the delegated `claude -p` path authenticates successfully in Phase 6"): a real `ccs ccs-hermes -p '/ck:brainstorm...'` delegation (model `claude-opus-4-8`, exit 0, `is_error: false`, ~111s, real task against `/home/hermes/workspace/nfi`) authenticated and completed end-to-end — see `plans/260705-1752-ccs-delegation-timeout-progress-tracking-fix/phase-03-live-host-verification.md` Addendum. No direct `claude auth status` check was run, but a successful delegated `claude -p` invocation is strictly stronger evidence per this phase's own success criteria.
 
 ## Context Links
 
