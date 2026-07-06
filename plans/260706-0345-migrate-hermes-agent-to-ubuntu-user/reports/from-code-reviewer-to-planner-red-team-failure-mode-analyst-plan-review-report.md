@@ -1,0 +1,78 @@
+# Failure Mode Analyst Review — Migrate Hermes Agent to Ubuntu User
+
+Role: Flow Tracer. Verified against live host state (`/etc/systemd/system/*.service`, `sudo -l`,
+`sqlite3 PRAGMA`, git history of `templates/systemd/`) and sibling plan
+`260705-1752-ccs-delegation-timeout-progress-tracking-fix` (live-host verification log).
+
+## Finding 1: ReadWritePaths omits the shared workspace dir — pre-existing EROFS bug survives the migration, contradicting Phase 5's own success criterion
+
+- **Severity:** Critical
+- **Location:** Phase 6, "Stage B — Cutover", step 4 (new unit file content); Phase 5, Success Criteria
+- **Flaw:** The plan's new `hermes.service` `ReadWritePaths=/home/ubuntu/.hermes /home/ubuntu/.ccs /tmp` does not include `/home/ubuntu/workspace`. Live unit confirms the same gap exists today for hermes (`ReadWritePaths=/home/hermes/.hermes /home/hermes/.ccs /tmp`, no `/home/hermes/workspace`). Phase 5's success criteria explicitly claims: "Post-cutover (Phase 6+), Hermes-delegated actions in `kitchen`/`nfi` succeed without `sudo` or permission errors (verified in Phase 7)." This is checked against a `ReadWritePaths` list that structurally can't satisfy it, because `ProtectHome=read-only` in the unit makes every path under `/home` read-only except what's explicitly listed.
+- **Failure scenario:** A delegated coding-agent task tries to write a report/edit/commit inside `/home/ubuntu/workspace/nfi` (or `kitchen`) post-cutover and gets `EROFS`/"Read-only file system", exactly reproducing a bug already observed in production today under the `hermes` user (same missing-path pattern, unfixed, just relocated).
+- **Evidence:**
+  - Live unit (`cat /etc/systemd/system/hermes.service`): `ReadWritePaths=/home/hermes/.hermes /home/hermes/.ccs /tmp` — no workspace path.
+  - Plan's own Phase 6 step 4: `ReadWritePaths=/home/ubuntu/.hermes /home/ubuntu/.ccs /tmp` — same gap, carried forward.
+  - Already-reproduced live failure, documented in sibling plan
+    `plans/260705-1752-ccs-delegation-timeout-progress-tracking-fix/phase-03-live-host-verification.md:544`:
+    `write_file → bash: line 3: /home/hermes/workspace/nfi/plans/.hermes-tmp.3810427: Read-only file system`.
+  - Same sibling plan's Unresolved Question 4 (line ~591-598) confirms this is unresolved and open, not a one-off fluke.
+- **Suggested fix:** Add `/home/ubuntu/workspace` to `ReadWritePaths` in Phase 6 step 4 (both units as applicable), and add an explicit write-test into a target repo (not just `ls`) to Phase 5 step 4 / Phase 7 functional verification, since Phase 5's current step 4 only checks `ls -la` (read a listing), which passes even when writes are blocked.
+
+## Finding 2: No state re-sync between Phase 3's copy and Phase 6's cutover — live WAL-mode DB writes during the intervening hours are silently dropped
+
+- **Severity:** Critical
+- **Location:** Phase 3, step 3 (state copy); Phase 6, Stage B (steps 5-8, no re-copy step)
+- **Flaw:** Phase 3 copies `state.db`, `kanban.db`, `sessions/` etc. **once**, early in the plan. `hermes.service` stays fully **active and serving live traffic** through Phases 3, 4, 5, and Stage A of Phase 6 (only stopped at Stage B step 5) — that's a multi-hour window per the plan's own effort estimates (Phase 3: 1.5h, Phase 4: 1h, Phase 5: 30m, Phase 6 Stage A: part of 2h). `state.db` is confirmed live in SQLite WAL journal mode, meaning committed transactions can sit in `state.db-wal` before being checkpointed into the base file — and the plan explicitly classifies `state.db-shm`/`state.db-wal` as "regenerate on start" disposable files, which is only true for a *fresh* instance, not for the source database being read *out from under* a live writer. Phase 6's Stage B has no step that re-copies `state.db`/`kanban.db`/`sessions/` between "stop old" (step 5) and "start new" (step 8).
+- **Failure scenario:** Any Telegram conversation, delegated task, or kanban queue item that happens between Phase 3's copy timestamp and Phase 6 step 5 (stop old) — hours of real production traffic — exists only in `/home/hermes/.hermes/state.db`(-wal) and is never propagated to `/home/ubuntu/.hermes/state.db`. When the new instance starts in step 8, it boots from the stale Phase-3 snapshot: users see conversation/session history "roll back in time," and any kanban tasks queued/completed during the gap vanish from the new instance's queue.
+- **Evidence:**
+  - `sqlite3 /home/hermes/.hermes/state.db "PRAGMA journal_mode;"` → `wal` (live host).
+  - `ls -la ~/.hermes/*.db*` shows `state.db-wal` present with a recent mtime distinct from `state.db`'s own mtime, i.e., there is unflushed WAL activity at any snapshot point.
+  - Phase 3's own table: "Not copied (runtime-only, regenerate on start) ... `state.db-shm`, `state.db-wal`" — treats WAL as disposable.
+  - `grep -n "cp -a\|resync\|re-copy\|state.db\|kanban" phase-06-blue-green-systemd-cutover.md` returns nothing except the unrelated `ReadWritePaths` mention — confirms no re-sync step exists in Phase 6.
+- **Suggested fix:** Add a final incremental re-copy of `state.db`, `kanban.db`, `kanban/`, `sessions/`, `channel_directory.json`, `gateway_state.json` as the **first action inside Stage B**, immediately after step 5 (stop old, so the source is quiesced) and before step 8 (start new) — not only once, early, in Phase 3.
+
+## Finding 3: Phase 7's rollback references a unit-file backup that doesn't exist, and its own suggested fallback (git template) demonstrably diverges from the live production unit
+
+- **Severity:** Critical
+- **Location:** Phase 7, "Rollback procedure" section; Phase 1, step 4 (backup format); Phase 8, step 2
+- **Flaw:** Phase 1 step 4 backs up both units into a **single concatenated file**: `cat hermes.service hermes-dashboard.service > hermes-old-systemd-units-260706.txt`. Phase 7's rollback script then does `sudo install ... /home/ubuntu/hermes-old-systemd-units-260706.txt-derived-hermes.service ...` — a file that was never created — with a comment telling the human to "split the backed-up combined file back into the two original unit files, or re-fetch from git if templates/systemd/*.service in this repo still matches." Live diff shows the repo template does **not** match production: it's missing the live `PATH=` override entirely is reversed (repo template *has* an extra `Environment=PATH=/home/hermes/.local/bin:...` line the live unit lacks) and its `ReadWritePaths` includes `/home/hermes/.claude` which the live unit does not have. So neither fallback ("split the txt" or "use the git template") is a mechanical, verified-safe rollback action.
+- **Failure scenario:** Stage B step 8 fails to start cleanly (e.g., a config typo surfaced only under the real systemd sandbox, not caught by Phase 6 Stage A's un-sandboxed dry run — see Finding 4). The human, under live-outage pressure, opens the rollback runbook and finds a copy-paste command referencing a file that doesn't exist. They fall back to the git template per the plan's own suggestion — and unknowingly deploy a *materially different* unit (extra `PATH=` env line, wider `ReadWritePaths`) than what was actually serving production before the migration started, introducing an unverified variable into an already-broken system instead of restoring known-good state.
+- **Evidence:**
+  - Phase 1 step 4: `cat /etc/systemd/system/hermes.service /etc/systemd/system/hermes-dashboard.service > /home/ubuntu/hermes-old-systemd-units-260706.txt` (single combined file, not two).
+  - Phase 7 rollback: `sudo install -m 0644 /home/ubuntu/hermes-old-systemd-units-260706.txt-derived-hermes.service /etc/systemd/system/hermes.service` — this exact path is never produced by any step in the plan.
+  - `diff templates/systemd/hermes.service /etc/systemd/system/hermes.service` (live host) shows two real deltas: an extra 9-line `Environment=PATH=...` block only in the repo template, and `ReadWritePaths` differs (`/home/hermes/.claude` present in template, absent live).
+  - Phase 8 step 2 (`sudo rm -f /etc/systemd/system/hermes.service.bak`) references a `.bak` file that no step in Phases 1-7 ever creates (`grep -rn "\.bak" phase-*.md` shows only `config.yaml.installer-default.bak` and `config.yaml.pre-phase4.bak`, neither of which is a systemd unit).
+- **Suggested fix:** In Phase 1, copy the two unit files to two separate, directly-installable backup files (`hermes.service.pre-migration.bak`, `hermes-dashboard.service.pre-migration.bak`), and have Phase 7's rollback `install` directly from those — no splitting, no "check git" branch decision during an active incident.
+
+## Finding 4: Phase 6 Stage A's "de-risking" dry run bypasses systemd sandboxing entirely, so it cannot catch the exact class of bug (ReadWritePaths/ProtectHome) most likely to break the real cutover
+
+- **Severity:** High
+- **Location:** Phase 6, Stage A, step 1
+- **Flaw:** Stage A validates the gateway by running it as a bare foreground process: `HOME=/home/ubuntu HERMES_CONFIG=... timeout 30 /home/ubuntu/.local/bin/hermes gateway run &`. This is a plain shell invocation with no `ProtectHome=`, `ReadWritePaths=`, `ProtectSystem=strict`, or any of the other systemd sandboxing directives that Stage B's real unit file applies. Sibling plan `260703-1738-fix-urgent-hermes-delegation-issues/phase-03-claude-auth-for-hermes.md:27` makes the identical point about a different phase: "Only `hermes gateway run` (the service) is sandboxed; a plain `sudo -u hermes` shell is not." The same logic applies here — Stage A's dry run is not sandboxed, so it structurally cannot surface Finding 1's `ReadWritePaths` gap (or any other sandbox-only permission failure) before Stage B's live-downtime cutover.
+- **Failure scenario:** Stage A reports "boots cleanly, no crash" (its literal success bar), builds false confidence that the config is Stage-B-ready, and the team proceeds to the actual downtime window — where the *first* real exposure to `ProtectHome=read-only`/`ReadWritePaths` restrictions happens live, with the bot down and the clock running on the "<5 min" downtime target.
+- **Evidence:** Phase 6 step 1 command has no `systemd-run --scope` or unit invocation — direct binary exec. Cross-referenced against sibling plan's explicit finding that only the real systemd-managed process is sandboxed (`phase-03-claude-auth-for-hermes.md:27`).
+- **Suggested fix:** Run Stage A's dry run via `systemd-run --uid=ubuntu --property=ProtectHome=read-only --property=ReadWritePaths=... ...` (or a scratch unit file with the real hardening block) instead of a bare process, so ReadWritePaths/ProtectHome issues surface before Stage B, not during it.
+
+## Finding 5: Phase 3 step 2 (config merge) requires human judgment but is tagged [AGENT] — violates the plan's own [HUMAN]/[AGENT] criteria and is the plan's own named top failure mode
+
+- **Severity:** High
+- **Location:** Phase 3, step 2; Overview, "[HUMAN] vs [AGENT] tagging" section
+- **Flaw:** The plan's own tagging rule says `[AGENT]` = "safe to run non-interactively," `[HUMAN]` = "needs an interactive terminal ... or a judgment call." Phase 3 step 2 is tagged `[AGENT]` but its instructions are: "If the diff shows *new required keys* ... merge those new keys into the copied config rather than blindly overwriting." Determining which diff lines are "new required keys introduced by a version bump" vs. "hermes's real customization" vs. "installer default noise" is exactly the kind of judgment call the plan's own tagging rubric reserves for `[HUMAN]`. Phase 3's own Risk Assessment even names this: "a botched config merge (step 2) is the most likely failure mode — a missing required key silently no-ops a feature rather than crashing."
+- **Failure scenario:** Run under `/ck:cook --parallel` (which the plan's Overview explicitly says "must not attempt `[HUMAN]` steps unattended" — implying `[AGENT]`-tagged steps *are* attempted unattended), an autonomous agent performs the merge, misjudges which config keys to keep vs. overwrite, and produces a config that boots (step 7's `hermes doctor` only checks for missing dependencies, not semantic correctness of merged config values) but silently drops a working feature (e.g., a routing rule, a memory setting) — discovered, if at all, well after cutover.
+- **Evidence:** Phase 3 step 2 tag `[AGENT]`; Phase 3 Risk Assessment: "a botched config merge (step 2) is the most likely failure mode"; Overview tagging definition explicitly ties `[HUMAN]` to "a judgment call."
+- **Suggested fix:** Re-tag Phase 3 step 2 as `[HUMAN]` (or `[HUMAN]` gate on any non-trivial diff output), consistent with the plan's own criteria.
+
+## Finding 6: Stage B's symlink retarget (step 6) commits a shared, systemwide resource before the new unit files exist or are validated — widens the partial-failure blast radius that Finding 3's broken rollback then can't cleanly reverse
+
+- **Severity:** Medium
+- **Location:** Phase 6, Stage B, steps 5-8
+- **Flaw:** Ordering is: (5) stop old services → (6) retarget the systemwide `/usr/local/bin/hermes` symlink to the ubuntu venv → (7) install new unit files + `daemon-reload` → (8) start new services. If step 8 fails (config typo, missing dependency only surfaced under the real sandbox per Finding 4), the box is left in a state where: old services are stopped, the shared symlink now points at the ubuntu venv, and the *new* (potentially broken) unit files are already installed on disk — overwriting the old ones in place with no atomic on-disk backup taken at that moment (Phase 1's backup is a stale, wrong-format snapshot per Finding 3). Rolling back requires reversing three independent pieces of state (symlink, two unit files, service start) using a rollback script that itself doesn't work as written (Finding 3).
+- **Failure scenario:** Step 8's `systemctl start hermes.service` fails and enters `failed` (or flaps within `StartLimitBurst=5`/`RestartSec=5` before giving up, live unit confirmed). At this exact moment there is no running Hermes service of either flavor, the human is mid-incident, and the documented recovery path is the same broken rollback from Finding 3.
+- **Evidence:** Phase 6 steps 5-8 order as written; live unit confirms `Restart=on-failure`, `RestartSec=5`, `StartLimitBurst=5`, `StartLimitInterval=300` (a genuinely failing start will flap for a bounded window then land in `failed`, not hang indefinitely — this part is fine, but doesn't help if the rollback script itself is broken).
+- **Suggested fix:** Do not retarget the shared symlink until *after* `systemctl start hermes.service` on the new units has been confirmed `active (running)` via a smoke boot using a temporary, differently-named unit (or `systemd-run`) that still points at the old symlink target during validation — collapse steps 6-8 into "start via a throwaway path, confirm healthy, only then retarget the shared symlink and swap unit files," shrinking the window where the shared resource is mutated before success is confirmed.
+
+## Unresolved Questions
+
+- Whether the sibling plan's live-reproduced `EROFS` bug (Finding 1) is considered explicitly "out of scope, ship it as-is" by the user, or whether this migration was expected to also close it — the plan's own Phase 5 success criteria language ("succeed without permission errors") suggests the latter but the `ReadWritePaths` list contradicts that.
+- Whether there is an intended maintenance window long enough to make Finding 2's re-sync fix (stop old → re-copy state → start new) fit inside the "<5 min" downtime target, given `state.db` is 12MB+ and growing — worth measuring actual re-copy time before locking in the 5-minute target.
