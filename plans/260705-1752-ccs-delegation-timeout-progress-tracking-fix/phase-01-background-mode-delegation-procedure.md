@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Background-Mode Delegation Procedure"
-status: pending
+status: completed
 priority: P1
 effort: "1.5h"
 dependencies: []
@@ -272,30 +272,34 @@ delegation call requested
 
 ## Success Criteria
 
-- [ ] `toolsets:` includes `terminal` (documented as non-security metadata).
-- [ ] Tier 1 procedure's default example uses `background=true,
+- [x] `toolsets:` includes `terminal` (documented as non-security metadata).
+- [x] Tier 1 procedure's default example uses `background=true,
       notify_on_complete=true` for any non-trivial task, with NO file
       redirect in the command string.
-- [ ] Explicit decision rule present distinguishing foreground-OK vs
+- [x] Explicit decision rule present distinguishing foreground-OK vs
       background-required cases, kept orthogonal to the Bash/no-Bash choice.
-- [ ] `process(action="poll"|"log"|"wait")` documented, with `wait`
+- [x] `process(action="poll"|"log"|"wait")` documented, with `wait`
       explicitly shown as a retry-on-`"timeout"` loop, not a one-shot call.
-- [ ] Wait-retry loop caps at 10 iterations (~30min); cap-exceeded path
+- [x] Wait-retry loop caps at 10 iterations (~30min); cap-exceeded path
       reports degraded status (session_id + "still running") instead of
       erroring or killing the session.
-- [ ] `session_id`-as-capability-token caveat present.
-- [ ] "Does not survive gateway restart" stated plainly, not as an open
+- [x] `session_id`-as-capability-token caveat present.
+- [x] "Does not survive gateway restart" stated plainly, not as an open
       question.
-- [ ] `<task>` shell-escaping guidance present.
-- [ ] Both `Read,Edit` and `Read,Edit,Bash` allowlist variants preserved for
+- [x] `<task>` shell-escaping guidance present.
+- [x] Both `Read,Edit` and `Read,Edit,Bash` allowlist variants preserved for
       both foreground and background shapes.
-- [ ] `parallel=3` example updated to use background mode (it fans out 3
+- [x] `parallel=3` example updated to use background mode (it fans out 3
       concurrent `ccs -p` calls — exactly the scenario that times out today)
       — no run-id/file-collision concern since no new file is introduced.
-- [ ] No foreground `timeout=` value above 600s appears anywhere (would be
+- [x] No foreground `timeout=` value above 600s appears anywhere (would be
       silently rejected by `FOREGROUND_MAX_TIMEOUT`).
-- [ ] File still passes basic Markdown/YAML frontmatter sanity (valid YAML,
+- [x] File still passes basic Markdown/YAML frontmatter sanity (valid YAML,
       no broken internal links).
+
+**Verified:** code-reviewer subagent pass (2026-07-05) + live-host Phase 3
+Test 1/4/5 exercised this file's actual procedure text on the real hermes
+host — see `phase-03-live-host-verification.md` Status Notes.
 
 ## Risk Assessment
 

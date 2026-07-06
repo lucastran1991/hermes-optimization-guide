@@ -6,7 +6,7 @@ description: >-
   (ck:brainstorm, ck:cook) exceed that and die with exit_code 124, losing all
   output. Fix: route through Hermes' native background+process(poll/wait/log)
   tooling instead, correct a stale log-path claim, verify live on the hermes host.
-status: pending
+status: completed-with-known-limitation
 priority: P1
 effort: "4h45m"
 branch: "main"
@@ -46,9 +46,9 @@ Secondary finding: the "Yes, bạn có thể tail log thực tế" advice this p
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | [Background-Mode Delegation Procedure](./phase-01-background-mode-delegation-procedure.md) | Pending |
-| 2 | [Guide Docs Accuracy Sync](./phase-02-guide-docs-accuracy-sync.md) | Pending |
-| 3 | [Live-Host Verification](./phase-03-live-host-verification.md) | Pending |
+| 1 | [Background-Mode Delegation Procedure](./phase-01-background-mode-delegation-procedure.md) | Completed (12/12 success criteria, code-reviewer clean) |
+| 2 | [Guide Docs Accuracy Sync](./phase-02-guide-docs-accuracy-sync.md) | Completed (3/3 success criteria, code-reviewer clean) |
+| 3 | [Live-Host Verification](./phase-03-live-host-verification.md) | Completed with known limitation (6/7 success criteria; `notify_on_complete`/check-back-later confirmed dead-end via CLI testing after the 10-iteration cap, scope unconfirmed for live Telegram/gateway sessions — see phase file Unresolved Question #2, deferred per user decision) |
 
 ## File-Ownership Matrix (parallel mode)
 
@@ -154,7 +154,18 @@ fatal design flaw found.
 ## Unresolved Questions
 
 1. ~~Whether `notify_on_complete`'s async delivery path passes output through `_redact_process_result`~~ — **widened and resolved into a blocking precondition** (Phase 3 Requirements item 0): read `hermes-agent#16843` before the live smoke test; escalate to a documented Phase 1 known-risk if it confirms `stream-json` redaction fragility. No longer purely open.
-2. Whether `metadata.hermes.requires_toolsets` (the schema this repo's `SKILL.md` does NOT use, but two other skills in this repo do) is itself enforced anywhere in the real tool-execution path, or is discovery-listing-only like the top-level `toolsets:` key — not traced by red-team. Not a blocker for this plan (this plan doesn't rely on either key for security), but worth a future note if per-skill tool restriction is ever wanted as a real control.
+2. **New (Phase 3 live-host verification, 2026-07-05):** confirmed via CLI
+   testing that `notify_on_complete`'s spontaneous delivery AND the
+   documented "check back later" `process(action=wait/poll)` fallback both
+   dead-end once the *originating `hermes chat -q` CLI turn* has ended
+   (session record goes `not_found`) — but this was tested via one-shot CLI
+   only (no Telegram access in this environment); NOT confirmed whether the
+   same teardown happens in a live, persistent Telegram/gateway conversation
+   (`hermes gateway run` stays up continuously, no matching "CLI cleanup"
+   event observed for it). Per explicit user decision, not fixed in Phase 1
+   yet — deferred pending a dedicated live-Telegram test. Full evidence:
+   `phase-03-live-host-verification.md` Status Notes + Unresolved Question 2.
+3. Whether `metadata.hermes.requires_toolsets` (the schema this repo's `SKILL.md` does NOT use, but two other skills in this repo do) is itself enforced anywhere in the real tool-execution path, or is discovery-listing-only like the top-level `toolsets:` key — not traced by red-team. Not a blocker for this plan (this plan doesn't rely on either key for security), but worth a future note if per-skill tool restriction is ever wanted as a real control.
 
 ## Validation Log
 

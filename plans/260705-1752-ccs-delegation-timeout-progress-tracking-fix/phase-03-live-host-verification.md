@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Live-Host Verification"
-status: pending
+status: completed-with-known-limitation
 priority: P1
 effort: "1.5h"
 dependencies: [1]
@@ -498,6 +498,56 @@ bug (out of this repo's scope to patch, same category as the existing
 session-ownership-gap note) and document it as a known limitation
 alongside the restart-survival caveat (Requirements item 9).
 
+### Addendum — Real Production Live-Test via Telegram (2026-07-05, user-reported)
+
+New evidence submitted by the user after Steps 1-7 above (which used one-shot
+`hermes chat -q` CLI calls, not real Telegram). Partially advances Unresolved
+Question 2 but does not close it — this run stayed well under both the 180s
+`wait()` clamp and the 10-iteration cap, so it never reached the failure mode
+those questions target.
+
+**Test as reported:**
+- Skill `coding-agent-delegate`, repo `/home/hermes/workspace/nfi` (a real
+  production repo, not the synthetic `kitchen` repo Tests 1-5 used).
+- Command built: `ccs ccs-hermes -p '/ck:brainstorm...' --allowedTools
+  'Read,Bash,Glob' --max-turns 15 --output-format stream-json --verbose
+  --include-partial-messages` — matches Phase 1's documented `harness: ccs`
+  background pattern (no file redirect, `stream-json`).
+- Model `claude-opus-4-8`, duration ~111s, `is_error: false`, exit 0.
+- Old failure mode (foreground killed after 75-120s timeout) did NOT recur —
+  background dispatch + `process(action="wait")` polling retrieved the final
+  result instead.
+- Artifact: a real EC2/16GB PM2 optimization assessment, 5 findings (PM2
+  memory sized for 24G not 16G; no Go heap limit `GOMEMLIMIT`/`GOGC` set;
+  Postgres missing `shared_buffers`/`work_mem` tuning; single-threaded 5s-tick
+  compute loop with sync DB inserts; verdict "likely fits 16GB, risk is
+  CPU/tick-loss not RAM").
+
+**Confirms:** the background-dispatch pattern works end-to-end on a real,
+non-synthetic multi-minute `/ck:brainstorm` task against a real user repo,
+reported as triggered via the live Telegram bot (not a `hermes chat -q`
+one-shot CLI call like Tests 1-6) — the exact gap Unresolved Question 2
+flagged as untested. Caveat: this phase did not observe the Telegram trigger
+directly (no Telegram access in this environment); taken as reported.
+
+**Does NOT confirm/deny:** the cap-exceeded / `notify_on_complete` dead-end
+defect found in Test 6 above — 111s never approaches the 180s clamp or the
+10-iteration (~30min) cap, so this run had no chance to hit either. The core
+open item (does the session-teardown-orphans-the-registry-record defect
+reproduce on a live, persistent Telegram/gateway conversation once a task
+runs past the cap) remains open.
+
+**New finding, outside this plan's original scope — report-artifact write
+failure:** the agent tried to save its findings to
+`/home/hermes/workspace/nfi/plans/live-test-coding-agent-delegate-report.md`
+and failed: `write_file` → `bash: line 3:
+/home/hermes/workspace/nfi/plans/.hermes-tmp.3810427: Read-only file system`;
+fell back to `/tmp/live-test-coding-agent-delegate-report.md`. Target repo's
+`plans/` dir (or the whole mount) is read-only for the hermes user — a
+target-repo filesystem-permission issue, not a Tier-1 `terminal`/`process`
+defect. Flagged as a new follow-up (Unresolved Question 4), not folded into
+Phase 1's scope.
+
 ## Unresolved Questions
 
 1. Whether `notify_on_complete`'s async delivery path passes output through
@@ -522,6 +572,12 @@ alongside the restart-survival caveat (Requirements item 9).
    Telegram message, let it run past the 10-iteration cap, stay idle
    (send no further messages) past actual completion, and check whether
    the bot proactively posts a completion message.
+   **Update (2026-07-05, see Addendum above):** a real Telegram-reported
+   production run (111s, repo `nfi`) confirms the background-dispatch
+   pattern works live via Telegram, but never crossed the 180s clamp or
+   the 10-iteration cap — the session-teardown/`notify_on_complete`
+   dead-end question is still open. Still needs a live-Telegram test that
+   deliberately runs past the cap to close this out.
 3. **New — whether `parallel=N` on this host actually routes through
    Phase 1's rewritten Tier-1 `terminal()`/`process()` pattern at all**, or
    always dispatches via the native `delegate_task`/ACP mechanism instead
@@ -530,3 +586,12 @@ alongside the restart-survival caveat (Requirements item 9).
    always triggers in practice, Phase 1's `parallel=3`-example Success
    Criteria item may be describing a code path the model doesn't actually
    take. Not confirmed as a defect — flagged for a future check.
+4. **New (2026-07-05, from Addendum above) — whether saving a delegation's
+   report artifact into the target repo's own `plans/` directory is
+   expected to work when that repo/mount is read-only for the hermes user**
+   (observed once: `/home/hermes/workspace/nfi/plans/` rejected the write
+   with "Read-only file system"). Unclear if `nfi`'s `plans/` dir is
+   deliberately read-only (e.g. mounted from a protected location) or a
+   misconfiguration. Out of Phase 1/3's original scope (`terminal`/`process`
+   background dispatch), but a real friction point users will hit — no fix
+   proposed here.

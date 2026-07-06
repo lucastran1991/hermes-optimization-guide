@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Guide Docs Accuracy Sync"
-status: pending
+status: completed
 priority: P3
 effort: "45m"
 dependencies: []
@@ -79,11 +79,14 @@ this plan's research:
 
 ## Success Criteria
 
-- [ ] `part18-coding-agents.md` clarifies native-`delegate_task` streaming
+- [x] `part18-coding-agents.md` clarifies native-`delegate_task` streaming
       vs. Tier-1 CLI shell-out are different mechanisms.
-- [ ] `CHANGELOG.md` has one new entry describing the fix, matching existing
+- [x] `CHANGELOG.md` has one new entry describing the fix, matching existing
       entry format/style.
-- [ ] No unrelated content changed in either file.
+- [x] No unrelated content changed in either file.
+
+**Verified:** code-reviewer subagent pass (2026-07-05) — `git diff --stat`
+confirmed only intended insertions, no unrelated files touched.
 
 ## Risk Assessment
 
