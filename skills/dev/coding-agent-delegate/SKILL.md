@@ -50,7 +50,7 @@ The routing table below shells out to external CLIs: `claude` (claude-code), `co
 
 ## Procedure
 
-1. **Parse the task** — read `task`, `repo`, `escalate`; classify intent (refactor / bugfix / explore / dependency_audit).
+1. **Parse the task** — read `task`, `repo`, `escalate`; classify intent (refactor / bugfix / explore / dependency_audit). `repo` resolves to the `cwd=` passed to every `terminal()` call below — without it the delegated CLI inherits whatever cwd the calling session already has, not the target repo.
 
 2. **Tier 1 — print mode (default)** — pick an agent via the `delegation.routing` cost table:
    ```yaml
@@ -81,6 +81,7 @@ The routing table below shells out to external CLIs: `claude` (claude-code), `co
        --allowedTools "Read,Edit" \
        --max-turns 20 \
        --output-format stream-json --verbose --include-partial-messages',
+     cwd=<repo>,
      background=true,
      notify_on_complete=true
    )
@@ -92,18 +93,19 @@ The routing table below shells out to external CLIs: `claude` (claude-code), `co
        --allowedTools "Read,Edit,Bash" \
        --max-turns 20 \
        --output-format stream-json --verbose --include-partial-messages',
+     cwd=<repo>,
      background=true,
      notify_on_complete=true
    )
    ```
 
-   **Foreground (exception) — single-file bugfix, `--max-turns` ≤ 10 only.** No-Bash:
+   **Foreground (exception) — single-file bugfix, `--max-turns` ≤ 10 only.** These are plain `terminal()` calls too — pass `cwd=<repo>` (shown here as `cd "<repo>" &&` since foreground examples are rendered as raw shell). No-Bash:
    ```bash
-   claude -p "<shell-escaped task>" --allowedTools "Read,Edit" --max-turns 10 --output-format json
+   cd "<repo>" && claude -p "<shell-escaped task>" --allowedTools "Read,Edit" --max-turns 10 --output-format json
    ```
    With Bash:
    ```bash
-   claude -p "<shell-escaped task>" --allowedTools "Read,Edit,Bash" --max-turns 10 --output-format json
+   cd "<repo>" && claude -p "<shell-escaped task>" --allowedTools "Read,Edit,Bash" --max-turns 10 --output-format json
    ```
    Foreground `terminal()` blocks up to `TERMINAL_TIMEOUT` (default 180s). Never request `timeout=` above 600s (`FOREGROUND_MAX_TIMEOUT`, the hard cap) in foreground mode — Hermes core rejects it outright and tells the caller to use `background=true` instead, which is exactly why background is the default above, not a raised timeout.
 
@@ -118,6 +120,7 @@ The routing table below shells out to external CLIs: `claude` (claude-code), `co
        --allowedTools "Read,Edit,Bash" \
        --max-turns 20 \
        --output-format stream-json --verbose --include-partial-messages',
+     cwd=<repo>,
      background=true,
      notify_on_complete=true
    )
@@ -244,6 +247,7 @@ sandboxes:
          --allowedTools "Read,Edit,Bash" \
          --max-turns 20 \
          --output-format stream-json --verbose --include-partial-messages',
+       cwd=../subtask-N,
        background=true,
        notify_on_complete=true
      )
