@@ -9,3 +9,9 @@
 node_modules/
 __pycache__/
 *.pyc
+
+# Audit raw output — may contain infra/permission details, keep methodology only
+audit/evidence/*
+audit/findings/*
+!audit/evidence/README.md
+!audit/findings/TEMPLATE.md
